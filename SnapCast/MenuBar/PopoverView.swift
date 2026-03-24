@@ -83,25 +83,13 @@ struct PopoverView: View {
 
     private var controlsView: some View {
         VStack(spacing: 12) {
-            Picker("Mode", selection: $settings.captureMode) {
+            Picker("", selection: $settings.captureMode) {
                 ForEach(CaptureMode.allCases, id: \.self) { mode in
-                    Label(mode.rawValue, systemImage: mode.systemImage)
-                        .tag(mode)
+                    Text(mode.rawValue).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
-
-            HStack {
-                Text("Format")
-                Spacer()
-                Picker("", selection: $settings.outputFormat) {
-                    ForEach(OutputFormat.allCases, id: \.self) { fmt in
-                        Text(fmt.rawValue).tag(fmt)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 120)
-            }
+            .labelsHidden()
 
             HStack {
                 Text("FPS: \(settings.fps)")
@@ -173,7 +161,7 @@ struct PopoverView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .scaleEffect(1.5)
-            Text("Encoding \(settings.outputFormat.rawValue)...")
+            Text("Encoding GIF...")
                 .font(.headline)
             Text("\(captureManager.capturedFrameCount) frames")
                 .font(.caption).foregroundColor(.secondary)
@@ -242,14 +230,6 @@ struct PopoverView: View {
                             Text(settings.loopCount == 0 ? "Infinite" : "\(settings.loopCount)×")
                                 .monospacedDigit()
                         }
-                    }
-                }
-
-                // AVIF
-                settingsSection("AVIF") {
-                    settingsRow("Quality") {
-                        Slider(value: $settings.quality, in: 0...1, step: 0.05)
-                        Text("\(Int(settings.quality * 100))%").frame(width: 36, alignment: .trailing).monospacedDigit()
                     }
                 }
 

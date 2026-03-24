@@ -211,13 +211,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
         Task.detached { [settings = self.settings] in
             do {
-                let encoder: FrameEncoder
-                switch settings.outputFormat {
-                case .gif:
-                    encoder = GIFEncoder()
-                case .avif:
-                    encoder = AVIFEncoder()
-                }
+                let encoder: FrameEncoder = GIFEncoder()
 
                 let url = try await encoder.encode(
                     frames: frames,

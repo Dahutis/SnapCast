@@ -16,12 +16,8 @@ enum CaptureMode: String, CaseIterable, Codable {
 
 enum OutputFormat: String, CaseIterable, Codable {
     case gif = "GIF"
-    case avif = "AVIF"
 
     var fileExtension: String {
-        switch self {
-        case .gif: return "gif"
-        case .avif: return "avif"
-        }
+        return "gif"
     }
 }
