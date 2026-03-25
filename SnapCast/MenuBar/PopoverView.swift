@@ -46,6 +46,8 @@ struct PopoverView: View {
 
             if showingSettings {
                 settingsPage
+            } else if settings.captureType == .merger {
+                mergerPage
             } else if settings.captureType == .screenshot {
                 screenshotPage
             } else {
@@ -91,6 +93,212 @@ struct PopoverView: View {
             }
         }
         .padding()
+    }
+
+    // MARK: - Merger Page
+
+    private var mergerPage: some View {
+        VStack(spacing: 0) {
+            if !ScreenPermissions.shared.isAuthorized {
+                permissionWarning.padding()
+            } else if captureManager.isExporting {
+                exportingMergerView.padding()
+            } else if captureManager.isMergerActive {
+                mergerActiveView
+            } else {
+                mergerIdleView.padding()
+            }
+
+            if let error = captureManager.exportError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .lineLimit(2)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+            }
+
+            if let url = captureManager.lastExportedURL, !captureManager.isMergerActive {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Merged & Saved!")
+                        .font(.caption)
+                    Spacer()
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    }
+                    .font(.caption)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
+        }
+    }
+
+    private var mergerIdleView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "square.stack.3d.up")
+                .font(.title)
+                .foregroundColor(.secondary)
+            Text("Capture multiple regions and merge them into one image")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+
+            Button(action: { captureManager.startMerger() }) {
+                HStack {
+                    Image(systemName: "plus.rectangle.on.rectangle")
+                    Text("Start Merger Session")
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.purple)
+            .controlSize(.large)
+        }
+    }
+
+    private var mergerActiveView: some View {
+        VStack(spacing: 0) {
+            // Thumbnail list with reorder
+            if captureManager.mergerCaptures.isEmpty {
+                VStack(spacing: 8) {
+                    Text("No captures yet")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Click below to capture your first region")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .frame(height: 80)
+                .frame(maxWidth: .infinity)
+            } else {
+                List {
+                    ForEach(Array(captureManager.mergerCaptures.enumerated()), id: \.element.id) { index, capture in
+                        HStack(spacing: 8) {
+                            Text("\(index + 1)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .frame(width: 16)
+
+                            Image(nsImage: capture.thumbnail)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(height: 40)
+                                .cornerRadius(4)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                                )
+
+                            VStack(alignment: .leading) {
+                                Text("\(capture.image.width)×\(capture.image.height)")
+                                    .font(.caption2)
+                                    .monospacedDigit()
+                            }
+
+                            Spacer()
+
+                            Button(action: { captureManager.removeMergerCapture(at: index) }) {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .onMove { source, dest in
+                        captureManager.moveMergerCapture(from: source, to: dest)
+                    }
+                }
+                .listStyle(.plain)
+                .frame(height: min(CGFloat(captureManager.mergerCaptures.count) * 52, 200))
+            }
+
+            Divider()
+
+            // Controls
+            VStack(spacing: 8) {
+                // Direction toggle
+                HStack {
+                    Text("Direction")
+                        .font(.caption).foregroundColor(.secondary)
+                    Spacer()
+                    Picker("", selection: $captureManager.mergeDirection) {
+                        ForEach(MergeDirection.allCases, id: \.self) { dir in
+                            Label(dir.rawValue, systemImage: dir.systemImage).tag(dir)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 170)
+                }
+
+                // Format
+                HStack {
+                    Text("Format")
+                        .font(.caption).foregroundColor(.secondary)
+                    Spacer()
+                    Picker("", selection: $settings.screenshotFormat) {
+                        ForEach(ScreenshotFormat.allCases, id: \.self) { fmt in
+                            Text(fmt.rawValue).tag(fmt)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 120)
+                }
+
+                // Capture next button
+                Button(action: { captureManager.captureNextMergerFrame() }) {
+                    HStack {
+                        Image(systemName: "plus.viewfinder")
+                        Text("Capture Region (\(captureManager.mergerCaptures.count))")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+                .controlSize(.large)
+
+                // Merge & Save button
+                HStack(spacing: 8) {
+                    Button(action: { captureManager.cancelMerger() }) {
+                        Text("Cancel")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+
+                    Button(action: { captureManager.mergeAndSave() }) {
+                        HStack {
+                            Image(systemName: "rectangle.compress.vertical")
+                            Text("Merge & Save")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.purple)
+                    .controlSize(.large)
+                    .disabled(captureManager.mergerCaptures.count < 2)
+                }
+            }
+            .padding()
+        }
+    }
+
+    private var exportingMergerView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .scaleEffect(1.5)
+            Text("Merging \(captureManager.mergerCaptures.count) captures...")
+                .font(.headline)
+        }
+        .padding(.vertical, 20)
     }
 
     // MARK: - Screenshot Page

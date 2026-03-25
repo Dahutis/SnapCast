@@ -3,11 +3,25 @@ import Foundation
 enum CaptureType: String, CaseIterable, Codable {
     case recording = "Recording"
     case screenshot = "Screenshot"
+    case merger = "Merger"
 
     var systemImage: String {
         switch self {
         case .recording: return "record.circle"
         case .screenshot: return "camera"
+        case .merger: return "square.stack.3d.up"
+        }
+    }
+}
+
+enum MergeDirection: String, CaseIterable, Codable {
+    case vertical = "Vertical"
+    case horizontal = "Horizontal"
+
+    var systemImage: String {
+        switch self {
+        case .vertical: return "arrow.up.and.down"
+        case .horizontal: return "arrow.left.and.right"
         }
     }
 }

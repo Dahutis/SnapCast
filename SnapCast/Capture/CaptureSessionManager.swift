@@ -14,6 +14,11 @@ class CaptureSessionManager: NSObject, ObservableObject {
     @Published var isTakingScreenshot = false
     @Published var scrollProgress: String?
 
+    // Merger state
+    @Published var mergerCaptures: [MergerCapture] = []
+    @Published var mergeDirection: MergeDirection = .vertical
+    @Published var isMergerActive = false
+
     let settings: CaptureSettings
 
     /// Set by MenuBarController so we can dismiss the popover before capture
@@ -113,6 +118,106 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 self.scrollProgress = nil
             }
         }
+    }
+
+    // MARK: - Merger
+
+    func startMerger() {
+        mergerCaptures = []
+        isMergerActive = true
+        exportError = nil
+        lastExportedURL = nil
+    }
+
+    func captureNextMergerFrame() {
+        guard isMergerActive else { return }
+        onCaptureStarting?()
+
+        Task {
+            guard let result = await RegionSelectionOverlay.selectRegion() else { return }
+            let display = result.display
+            let rect = result.rect
+
+            do {
+                let filter = SCContentFilter(display: display, excludingWindows: [])
+                let config = SCStreamConfiguration()
+                config.width = display.width * 2
+                config.height = display.height * 2
+                config.pixelFormat = kCVPixelFormatType_32BGRA
+                config.showsCursor = false
+                if #available(macOS 14.0, *) {
+                    config.captureResolution = .best
+                }
+
+                let fullImage = try await ScreenshotCapture.captureSingleFrame(
+                    filter: filter, configuration: config
+                )
+
+                let scaleX = CGFloat(fullImage.width) / CGFloat(display.width)
+                let scaleY = CGFloat(fullImage.height) / CGFloat(display.height)
+                let scaledCrop = CGRect(
+                    x: rect.origin.x * scaleX,
+                    y: rect.origin.y * scaleY,
+                    width: rect.width * scaleX,
+                    height: rect.height * scaleY
+                )
+
+                if let cropped = fullImage.cropping(to: scaledCrop) {
+                    let capture = MergerCapture(image: cropped)
+                    self.mergerCaptures.append(capture)
+                }
+            } catch {
+                self.exportError = "Capture failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    func removeMergerCapture(at index: Int) {
+        guard mergerCaptures.indices.contains(index) else { return }
+        mergerCaptures.remove(at: index)
+    }
+
+    func moveMergerCapture(from source: IndexSet, to destination: Int) {
+        mergerCaptures.move(fromOffsets: source, toOffset: destination)
+    }
+
+    func mergeAndSave() {
+        guard !mergerCaptures.isEmpty else { return }
+
+        isExporting = true
+        let images = mergerCaptures.map { $0.image }
+        let direction = mergeDirection
+
+        Task.detached { [settings = self.settings] in
+            do {
+                let merged: CGImage
+                if direction == .vertical {
+                    merged = try MergerStitcher.stitchVertical(images)
+                } else {
+                    merged = try MergerStitcher.stitchHorizontal(images)
+                }
+
+                let final_ = ScreenshotCapture.applyResize(image: merged, settings: settings)
+                let url = try ScreenshotCapture.saveImage(final_, settings: settings)
+
+                await MainActor.run {
+                    self.lastExportedURL = url
+                    self.isExporting = false
+                    self.isMergerActive = false
+                    self.mergerCaptures = []
+                }
+            } catch {
+                await MainActor.run {
+                    self.exportError = "Merge failed: \(error.localizedDescription)"
+                    self.isExporting = false
+                }
+            }
+        }
+    }
+
+    func cancelMerger() {
+        mergerCaptures = []
+        isMergerActive = false
     }
 
     // MARK: - Private

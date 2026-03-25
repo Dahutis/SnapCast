@@ -26,6 +26,7 @@
 		A100000017 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B100000017; };
 		A100000018 /* ScreenshotCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000020; };
 		A100000019 /* FullPageCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000021; };
+		A100000022 /* MergerStitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000024; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +51,7 @@
 		B100000019 /* SnapCast.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapCast.entitlements; sourceTree = "<group>"; };
 		B100000020 /* ScreenshotCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCapture.swift; sourceTree = "<group>"; };
 		B100000021 /* FullPageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullPageCapture.swift; sourceTree = "<group>"; };
+		B100000024 /* MergerStitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergerStitcher.swift; sourceTree = "<group>"; };
 		C100000001 /* SnapCast.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapCast.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -115,6 +117,7 @@
 				B100000005 /* FrameProcessor.swift */,
 				B100000020 /* ScreenshotCapture.swift */,
 				B100000021 /* FullPageCapture.swift */,
+				B100000024 /* MergerStitcher.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -251,6 +254,7 @@
 				A100000016 /* KeyboardShortcuts.swift in Sources */,
 				A100000018 /* ScreenshotCapture.swift in Sources */,
 				A100000019 /* FullPageCapture.swift in Sources */,
+				A100000022 /* MergerStitcher.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
