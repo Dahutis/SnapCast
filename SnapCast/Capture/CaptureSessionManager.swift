@@ -11,6 +11,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
     @Published var lastExportedURL: URL?
     @Published var isExporting = false
     @Published var exportError: String?
+    @Published var isTakingScreenshot = false
+    @Published var scrollProgress: String?
 
     let settings: CaptureSettings
 
@@ -76,6 +78,39 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 timer?.invalidate()
                 timer = nil
                 frameProcessor = nil
+            }
+        }
+    }
+
+    // MARK: - Screenshot
+
+    func takeScreenshot() {
+        guard !isRecording, !isTakingScreenshot else { return }
+
+        exportError = nil
+        lastExportedURL = nil
+
+        onCaptureStarting?()
+        isTakingScreenshot = true
+
+        let mode = settings.screenshotMode
+        if mode == .fullPage {
+            scrollProgress = "Loading page..."
+        }
+
+        Task {
+            do {
+                let url = try await ScreenshotCapture.capture(mode: mode, settings: settings)
+                self.lastExportedURL = url
+                self.isTakingScreenshot = false
+                self.scrollProgress = nil
+            } catch let error as ScreenshotError where error.errorDescription == "Screenshot cancelled" {
+                self.isTakingScreenshot = false
+                self.scrollProgress = nil
+            } catch {
+                self.exportError = error.localizedDescription
+                self.isTakingScreenshot = false
+                self.scrollProgress = nil
             }
         }
     }

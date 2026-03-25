@@ -30,10 +30,24 @@ struct PopoverView: View {
             .padding(.top, 12)
             .padding(.bottom, 8)
 
+            if !showingSettings {
+                Picker("", selection: $settings.captureType) {
+                    ForEach(CaptureType.allCases, id: \.self) { type in
+                        Label(type.rawValue, systemImage: type.systemImage).tag(type)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.horizontal)
+                .padding(.bottom, 4)
+            }
+
             Divider()
 
             if showingSettings {
                 settingsPage
+            } else if settings.captureType == .screenshot {
+                screenshotPage
             } else {
                 mainPage
             }
@@ -77,6 +91,138 @@ struct PopoverView: View {
             }
         }
         .padding()
+    }
+
+    // MARK: - Screenshot Page
+
+    private var screenshotPage: some View {
+        VStack(spacing: 12) {
+            if !ScreenPermissions.shared.isAuthorized {
+                permissionWarning
+            } else if captureManager.isTakingScreenshot {
+                screenshotProgressView
+            } else {
+                screenshotControlsView
+            }
+
+            if let error = captureManager.exportError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .lineLimit(2)
+            }
+
+            if let url = captureManager.lastExportedURL {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Saved!")
+                        .font(.caption)
+                    Spacer()
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    }
+                    .font(.caption)
+                }
+            }
+        }
+        .padding()
+    }
+
+    private var screenshotControlsView: some View {
+        VStack(spacing: 12) {
+            // Mode grid
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    screenshotModeButton(.region)
+                    screenshotModeButton(.window)
+                }
+                HStack(spacing: 6) {
+                    screenshotModeButton(.fullScreen)
+                    screenshotModeButton(.fullPage)
+                }
+            }
+
+            if settings.screenshotMode == .fullPage {
+                VStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "globe")
+                            .foregroundColor(.blue)
+                            .font(.caption)
+                        TextField("https://example.com", text: $settings.fullPageURL)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.caption)
+                    }
+
+                    HStack {
+                        Text("Width: \(settings.fullPageWidth)px")
+                            .font(.caption2).foregroundColor(.secondary)
+                        Spacer()
+                        Text("Wait: \(String(format: "%.0fs", settings.fullPageWaitTime))")
+                            .font(.caption2).foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            HStack {
+                Text("Format")
+                    .font(.caption).foregroundColor(.secondary)
+                Spacer()
+                Picker("", selection: $settings.screenshotFormat) {
+                    ForEach(ScreenshotFormat.allCases, id: \.self) { fmt in
+                        Text(fmt.rawValue).tag(fmt)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 120)
+            }
+
+            Button(action: { captureManager.takeScreenshot() }) {
+                HStack {
+                    Image(systemName: screenshotButtonIcon)
+                    Text(screenshotButtonLabel)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
+            .controlSize(.large)
+            .disabled(settings.screenshotMode == .fullPage && settings.fullPageURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    private var screenshotButtonIcon: String {
+        settings.screenshotMode == .fullPage ? "scroll" : "camera"
+    }
+
+    private var screenshotButtonLabel: String {
+        settings.screenshotMode == .fullPage ? "Capture Full Page" : "Take Screenshot"
+    }
+
+    private func screenshotModeButton(_ mode: ScreenshotMode) -> some View {
+        Button(action: { settings.screenshotMode = mode }) {
+            HStack(spacing: 6) {
+                Image(systemName: mode.systemImage)
+                    .font(.caption)
+                Text(mode.rawValue)
+                    .font(.caption)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.bordered)
+        .tint(settings.screenshotMode == mode ? .blue : .secondary)
+    }
+
+    private var screenshotProgressView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .scaleEffect(1.5)
+            Text(captureManager.scrollProgress ?? "Capturing...")
+                .font(.headline)
+        }
+        .padding(.vertical, 20)
     }
 
     // MARK: - Controls (idle)
@@ -233,6 +379,21 @@ struct PopoverView: View {
                     }
                 }
 
+                // Full Page
+                settingsSection("Full Page Capture") {
+                    settingsRow("Viewport") {
+                        Slider(value: fullPageWidthBinding, in: 800...2560, step: 10)
+                        Text("\(settings.fullPageWidth)").frame(width: 40, alignment: .trailing).monospacedDigit()
+                    }
+                    settingsRow("Wait Time") {
+                        Slider(value: $settings.fullPageWaitTime, in: 1...10, step: 0.5)
+                        Text(String(format: "%.0fs", settings.fullPageWaitTime)).frame(width: 28, alignment: .trailing).monospacedDigit()
+                    }
+                    Text("Viewport width for rendering. Wait time for JS/images to load after page is ready.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
                 // Output
                 settingsSection("Output") {
                     Toggle("Resize", isOn: $settings.resizeEnabled)
@@ -320,6 +481,9 @@ struct PopoverView: View {
     }
     private var colorBinding: Binding<Double> {
         Binding(get: { Double(settings.colorCount) }, set: { settings.colorCount = Int($0) })
+    }
+    private var fullPageWidthBinding: Binding<Double> {
+        Binding(get: { Double(settings.fullPageWidth) }, set: { settings.fullPageWidth = Int($0) })
     }
 
     private func chooseFolder() {

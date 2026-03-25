@@ -56,6 +56,16 @@ class KeyboardShortcuts {
             }
             return
         }
+
+        // Cmd+Shift+7 - take screenshot
+        if modifiers == [.command, .shift] && event.keyCode == 26 { // kVK_ANSI_7
+            Task { @MainActor in
+                if !captureManager.isRecording && !captureManager.isTakingScreenshot {
+                    captureManager.takeScreenshot()
+                }
+            }
+            return
+        }
     }
 
     deinit {

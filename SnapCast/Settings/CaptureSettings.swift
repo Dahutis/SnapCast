@@ -2,11 +2,29 @@ import Foundation
 import Combine
 
 class CaptureSettings: ObservableObject {
+    @Published var captureType: CaptureType {
+        didSet { UserDefaults.standard.set(captureType.rawValue, forKey: "captureType") }
+    }
     @Published var captureMode: CaptureMode {
         didSet { UserDefaults.standard.set(captureMode.rawValue, forKey: "captureMode") }
     }
+    @Published var screenshotMode: ScreenshotMode {
+        didSet { UserDefaults.standard.set(screenshotMode.rawValue, forKey: "screenshotMode") }
+    }
+    @Published var screenshotFormat: ScreenshotFormat {
+        didSet { UserDefaults.standard.set(screenshotFormat.rawValue, forKey: "screenshotFormat") }
+    }
     @Published var outputFormat: OutputFormat {
         didSet { UserDefaults.standard.set(outputFormat.rawValue, forKey: "outputFormat") }
+    }
+    @Published var fullPageURL: String {
+        didSet { UserDefaults.standard.set(fullPageURL, forKey: "fullPageURL") }
+    }
+    @Published var fullPageWidth: Int {
+        didSet { UserDefaults.standard.set(fullPageWidth, forKey: "fullPageWidth") }
+    }
+    @Published var fullPageWaitTime: Double {
+        didSet { UserDefaults.standard.set(fullPageWaitTime, forKey: "fullPageWaitTime") }
     }
     @Published var fps: Int {
         didSet { UserDefaults.standard.set(fps, forKey: "fps") }
@@ -54,8 +72,14 @@ class CaptureSettings: ObservableObject {
 
     init() {
         let defaults = UserDefaults.standard
+        self.captureType = CaptureType(rawValue: defaults.string(forKey: "captureType") ?? "") ?? .recording
         self.captureMode = CaptureMode(rawValue: defaults.string(forKey: "captureMode") ?? "") ?? .region
+        self.screenshotMode = ScreenshotMode(rawValue: defaults.string(forKey: "screenshotMode") ?? "") ?? .region
+        self.screenshotFormat = ScreenshotFormat(rawValue: defaults.string(forKey: "screenshotFormat") ?? "") ?? .png
         self.outputFormat = OutputFormat(rawValue: defaults.string(forKey: "outputFormat") ?? "") ?? .gif
+        self.fullPageURL = defaults.string(forKey: "fullPageURL") ?? ""
+        self.fullPageWidth = defaults.object(forKey: "fullPageWidth") as? Int ?? 1440
+        self.fullPageWaitTime = defaults.object(forKey: "fullPageWaitTime") as? Double ?? 3.0
         self.fps = defaults.object(forKey: "fps") as? Int ?? 15
         self.quality = defaults.object(forKey: "quality") as? Double ?? 0.8
         self.resizeEnabled = defaults.bool(forKey: "resizeEnabled")
