@@ -1,0 +1,560 @@
+{
+  "source": "/Users/personal/Documents/NxCapture/SnapCast/MenuBar/PopoverView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 36
+        }
+      },
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 21
+        }
+      },
+      {
+        "comment": "",
+        "key": "SnapCast",
+        "location": {
+          "startingColumn": 53,
+          "startingLine": 21
+        }
+      },
+      {
+        "comment": "",
+        "key": "Saved!",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show in Finder",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 96
+        }
+      },
+      {
+        "comment": "",
+        "key": "Merged & Saved!",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 133
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show in Finder",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 136
+        }
+      },
+      {
+        "comment": "",
+        "key": "Capture multiple regions and merge them into one image",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 152
+        }
+      },
+      {
+        "comment": "",
+        "key": "Start Merger Session",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 160
+        }
+      },
+      {
+        "comment": "",
+        "key": "No captures yet",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 176
+        }
+      },
+      {
+        "comment": "",
+        "key": "Click below to capture your first region",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 179
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 189
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld×%lld",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 205
+        }
+      },
+      {
+        "comment": "",
+        "key": "Direction",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 235
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 238
+        }
+      },
+      {
+        "comment": "",
+        "key": "Format",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 249
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 252
+        }
+      },
+      {
+        "comment": "",
+        "key": "Capture Region (%lld)",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 265
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 277
+        }
+      },
+      {
+        "comment": "",
+        "key": "Merge & Save",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 287
+        }
+      },
+      {
+        "comment": "",
+        "key": "Merging %lld captures...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 306
+        }
+      },
+      {
+        "comment": "",
+        "key": "Saved!",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 335
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show in Finder",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 338
+        }
+      },
+      {
+        "comment": "",
+        "key": "https://example.com",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 368
+        }
+      },
+      {
+        "comment": "",
+        "key": "Width: %lldpx",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 374
+        }
+      },
+      {
+        "comment": "",
+        "key": "Wait: %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 377
+        }
+      },
+      {
+        "comment": "",
+        "key": "Format",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 384
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 387
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 448
+        }
+      },
+      {
+        "comment": "",
+        "key": "FPS: %lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 457
+        }
+      },
+      {
+        "comment": "",
+        "key": "Max: %llds",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 460
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delay: %llds",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 464
+        }
+      },
+      {
+        "comment": "",
+        "key": "Start Recording",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 473
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld frames captured",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 500
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 515
+        }
+      },
+      {
+        "comment": "",
+        "key": "Recording",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 493
+        }
+      },
+      {
+        "comment": "",
+        "key": "Stop Recording",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 506
+        }
+      },
+      {
+        "comment": "",
+        "key": "Encoding GIF...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 526
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld frames",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 528
+        }
+      },
+      {
+        "comment": "",
+        "key": "Screen Recording Permission Required",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 541
+        }
+      },
+      {
+        "comment": "",
+        "key": "System Settings → Privacy & Security → Screen Recording",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 544
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open System Settings",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 548
+        }
+      },
+      {
+        "comment": "",
+        "key": "Check Again",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 551
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show Cursor",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 604
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 594
+        }
+      },
+      {
+        "comment": "",
+        "key": "%llds",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 598
+        }
+      },
+      {
+        "comment": "",
+        "key": "%llds",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 602
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dithering",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 614
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 612
+        }
+      },
+      {
+        "comment": "",
+        "key": "Infinite",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 618
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld×",
+        "location": {
+          "startingColumn": 73,
+          "startingLine": 618
+        }
+      },
+      {
+        "comment": "",
+        "key": "Viewport width for rendering. Wait time for JS/images to load after page is ready.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 634
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 628
+        }
+      },
+      {
+        "comment": "",
+        "key": "Copy to Clipboard",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 641
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show Preview Toast",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 643
+        }
+      },
+      {
+        "comment": "",
+        "key": "Resize",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 645
+        }
+      },
+      {
+        "comment": "",
+        "key": "Keep Aspect Ratio",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 660
+        }
+      },
+      {
+        "comment": "",
+        "key": "W",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 649
+        }
+      },
+      {
+        "comment": "",
+        "key": "×",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 653
+        }
+      },
+      {
+        "comment": "",
+        "key": "H",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 654
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 650
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 655
+        }
+      },
+      {
+        "comment": "",
+        "key": "Folder",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 665
+        }
+      },
+      {
+        "comment": "",
+        "key": "...",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 673
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reset to Defaults",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 690
+        }
+      },
+      {
+        "comment": "",
+        "key": "Quit SnapCast",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 699
+        }
+      },
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 770
+        }
+      },
+      {
+        "comment": "",
+        "key": "Grant",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 787
+        }
+      },
+      {
+        "comment": "",
+        "key": "Relaunch",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 779
+        }
+      }
+    ]
+  },
+  "version": 1
+}

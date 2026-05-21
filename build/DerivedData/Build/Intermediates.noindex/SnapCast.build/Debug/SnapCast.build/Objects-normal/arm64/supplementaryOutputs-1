@@ -1,0 +1,23 @@
+{
+  "/Users/personal/Documents/NxCapture/SnapCast/App/AppDelegate.swift" : {
+    "const-values" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/AppDelegate.swiftconstvalues",
+    "dependencies" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/AppDelegate.d",
+    "diagnostics" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/AppDelegate.dia",
+    "object" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/AppDelegate.o",
+    "swift-dependencies" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/AppDelegate.swiftdeps"
+  },
+  "/Users/personal/Documents/NxCapture/SnapCast/App/SnapCastApp.swift" : {
+    "const-values" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/SnapCastApp.swiftconstvalues",
+    "dependencies" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/SnapCastApp.d",
+    "diagnostics" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/SnapCastApp.dia",
+    "object" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/SnapCastApp.o",
+    "swift-dependencies" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/SnapCastApp.swiftdeps"
+  },
+  "/Users/personal/Documents/NxCapture/SnapCast/Capture/CaptureMode.swift" : {
+    "const-values" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/CaptureMode.swiftconstvalues",
+    "dependencies" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/CaptureMode.d",
+    "diagnostics" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/CaptureMode.dia",
+    "object" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/CaptureMode.o",
+    "swift-dependencies" : "/Users/personal/Documents/NxCapture/build/DerivedData/Build/Intermediates.noindex/SnapCast.build/Debug/SnapCast.build/Objects-normal/arm64/CaptureMode.swiftdeps"
+  }
+}

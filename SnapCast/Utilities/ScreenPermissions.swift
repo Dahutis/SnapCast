@@ -1,6 +1,7 @@
 import AppKit
 import ScreenCaptureKit
 
+@MainActor
 class ScreenPermissions: ObservableObject {
     static let shared = ScreenPermissions()
 

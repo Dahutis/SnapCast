@@ -3,6 +3,8 @@ import SwiftUI
 struct PopoverView: View {
     @EnvironmentObject var settings: CaptureSettings
     @ObservedObject var captureManager: CaptureSessionManager
+    @ObservedObject private var screenPermissions = ScreenPermissions.shared
+    @ObservedObject private var accessibilityPermissions = AccessibilityPermissions.shared
     @State private var showingSettings = false
     @State private var pulseOpacity: Double = 1.0
 
@@ -55,6 +57,12 @@ struct PopoverView: View {
             }
         }
         .frame(width: 320)
+        .onAppear {
+            // Re-read permission state every time the popover opens so the UI
+            // reflects grants the user made in System Settings while away.
+            screenPermissions.checkPermission()
+            accessibilityPermissions.refresh()
+        }
     }
 
     // MARK: - Main Page
@@ -553,6 +561,32 @@ struct PopoverView: View {
     private var settingsPage: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                // Permissions
+                settingsSection("Permissions") {
+                    permissionRow(
+                        icon: "rectangle.dashed.badge.record",
+                        title: "Screen Recording",
+                        subtitle: "Required to capture screen content",
+                        isGranted: screenPermissions.isAuthorized,
+                        needsRelaunch: false,
+                        grantAction: { screenPermissions.checkPermission() },
+                        openAction: { screenPermissions.openSettings() },
+                        relaunchAction: nil
+                    )
+                    permissionRow(
+                        icon: "keyboard",
+                        title: "Accessibility",
+                        subtitle: accessibilityPermissions.needsRelaunch
+                            ? "Granted — relaunch to apply"
+                            : "Required for global keyboard shortcuts",
+                        isGranted: accessibilityPermissions.isAuthorized,
+                        needsRelaunch: accessibilityPermissions.needsRelaunch,
+                        grantAction: { accessibilityPermissions.requestAccess() },
+                        openAction: { accessibilityPermissions.openSettings() },
+                        relaunchAction: { accessibilityPermissions.relaunch() }
+                    )
+                }
+
                 // Recording
                 settingsSection("Recording") {
                     settingsRow("FPS") {
@@ -604,6 +638,10 @@ struct PopoverView: View {
 
                 // Output
                 settingsSection("Output") {
+                    Toggle("Copy to Clipboard", isOn: $settings.copyToClipboard)
+                        .font(.caption)
+                    Toggle("Show Preview Toast", isOn: $settings.showCaptureToast)
+                        .font(.caption)
                     Toggle("Resize", isOn: $settings.resizeEnabled)
                         .font(.caption)
                     if settings.resizeEnabled {
@@ -633,6 +671,23 @@ struct PopoverView: View {
                             .lineLimit(1)
                             .truncationMode(.head)
                         Button("...") { chooseFolder() }
+                            .font(.caption)
+                    }
+                }
+
+                // Shortcuts
+                settingsSection("Shortcuts") {
+                    ForEach(ShortcutAction.allCases, id: \.self) { action in
+                        HStack {
+                            Text(action.displayName)
+                                .font(.caption)
+                            Spacer()
+                            ShortcutRecorderField(binding: settings.binding(for: action))
+                        }
+                    }
+                    HStack {
+                        Spacer()
+                        Button("Reset to Defaults") { settings.resetShortcuts() }
                             .font(.caption)
                     }
                 }
@@ -678,6 +733,77 @@ struct PopoverView: View {
         }
     }
 
+    @ViewBuilder
+    private func permissionRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        isGranted: Bool,
+        needsRelaunch: Bool,
+        grantAction: @escaping () -> Void,
+        openAction: @escaping () -> Void,
+        relaunchAction: (() -> Void)?
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(isGranted ? .green : (needsRelaunch ? .orange : .secondary))
+                .frame(width: 22)
+
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    Image(systemName: statusIcon(isGranted: isGranted, needsRelaunch: needsRelaunch))
+                        .font(.caption2)
+                        .foregroundColor(statusColor(isGranted: isGranted, needsRelaunch: needsRelaunch))
+                }
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            if isGranted {
+                Button("Settings", action: openAction)
+                    .font(.caption)
+                    .buttonStyle(.borderless)
+                    .foregroundColor(.secondary)
+            } else if needsRelaunch, let relaunch = relaunchAction {
+                Button(action: relaunch) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption2)
+                        Text("Relaunch")
+                    }
+                    .font(.caption)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .controlSize(.small)
+            } else {
+                Button("Grant", action: grantAction)
+                    .font(.caption)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func statusIcon(isGranted: Bool, needsRelaunch: Bool) -> String {
+        if isGranted { return "checkmark.circle.fill" }
+        if needsRelaunch { return "arrow.clockwise.circle.fill" }
+        return "exclamationmark.circle.fill"
+    }
+
+    private func statusColor(isGranted: Bool, needsRelaunch: Bool) -> Color {
+        if isGranted { return .green }
+        return .orange
+    }
+
     private var fpsBinding: Binding<Double> {
         Binding(get: { Double(settings.fps) }, set: { settings.fps = Int($0) })
     }
@@ -715,5 +841,89 @@ struct PopoverView: View {
         let seconds = Int(interval) % 60
         let tenths = Int((interval - Double(Int(interval))) * 10)
         return String(format: "%d:%02d.%d", minutes, seconds, tenths)
+    }
+}
+
+// MARK: - Shortcut Recorder
+
+/// Click to start recording a key chord; press a chord to capture it; Esc to
+/// cancel. The × button clears the binding entirely. While any field is in
+/// recording mode the global dispatcher is paused (see ShortcutRecording).
+struct ShortcutRecorderField: View {
+    @Binding var binding: ShortcutBinding?
+
+    @State private var isRecording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color(NSColor.controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(isRecording ? Color.accentColor : Color.secondary.opacity(0.3),
+                                    lineWidth: isRecording ? 1.5 : 1)
+                    )
+                Text(displayText)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(isRecording ? .accentColor : .primary)
+                    .padding(.horizontal, 8)
+            }
+            .frame(width: 100, height: 22)
+            .contentShape(Rectangle())
+            .onTapGesture { toggleRecording() }
+
+            Button(action: { binding = nil }) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.plain)
+            .opacity(binding != nil ? 1 : 0.3)
+            .disabled(binding == nil)
+        }
+        .onDisappear { stopRecording() }
+    }
+
+    private var displayText: String {
+        if isRecording { return "Press keys…" }
+        return binding?.displayString ?? "—"
+    }
+
+    private func toggleRecording() {
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
+        }
+    }
+
+    private func startRecording() {
+        guard !isRecording else { return }
+        isRecording = true
+        ShortcutRecording.isActive = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            // Esc with no modifiers cancels the recording itself.
+            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if event.keyCode == 53 && mods.isEmpty {
+                stopRecording()
+                return nil
+            }
+            if let captured = ShortcutBinding(event: event) {
+                binding = captured
+                stopRecording()
+            }
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        isRecording = false
+        ShortcutRecording.isActive = false
+        if let m = monitor {
+            NSEvent.removeMonitor(m)
+            monitor = nil
+        }
     }
 }

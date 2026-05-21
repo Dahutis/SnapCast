@@ -63,6 +63,10 @@ class MenuBarController {
 
     private func showPopover() {
         guard let button = statusItem.button else { return }
+        // Activate so the popover receives keyboard focus — without this the
+        // app stays in LSUIElement-passive state and the local NSEvent monitor
+        // never sees keyDown events.
+        NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 

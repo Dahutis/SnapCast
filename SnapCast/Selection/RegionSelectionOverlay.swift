@@ -39,12 +39,13 @@ private class OverlayController {
     func show() {
         for screen in NSScreen.screens {
             let view = OverlayView()
-            let window = NSWindow(
-                contentRect: screen.frame,
+            // Start with a tiny placeholder rect so init can't pre-clamp on contentRect.
+            // We force the real frame after the window is fully configured.
+            let window = OverlayWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
                 styleMask: .borderless,
                 backing: .buffered,
-                defer: false,
-                screen: screen
+                defer: false
             )
 
             window.level = .screenSaver
@@ -56,6 +57,10 @@ private class OverlayController {
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             window.isReleasedWhenClosed = false
             window.contentView = view
+
+            // Force the window onto the target screen's global rectangle. With
+            // constrainFrameRect overridden, AppKit won't reshape it.
+            window.setFrame(screen.frame, display: true)
 
             view.onSelectionComplete = { [weak self] rect in
                 self?.finish(rect: rect, screen: screen)
@@ -127,6 +132,18 @@ private class OverlayController {
     }
 }
 
+// MARK: - Overlay Window (borderless full-screen, no AppKit reshaping)
+
+private class OverlayWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        // Cover the full screen, including the menu-bar strip — AppKit would otherwise
+        // squeeze borderless windows away from the menu bar.
+        return frameRect
+    }
+}
+
 // MARK: - Overlay View (handles drawing + mouse interaction)
 
 private class OverlayView: NSView {
@@ -137,6 +154,7 @@ private class OverlayView: NSView {
     private var currentPoint: CGPoint?
     private var isDragging = false
     private var trackingArea: NSTrackingArea?
+    private var cancelButton: NSButton?
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -144,6 +162,26 @@ private class OverlayView: NSView {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
         updateTrackingArea()
+        installCancelButton()
+    }
+
+    private func installCancelButton() {
+        guard cancelButton == nil else { return }
+        let btn = NSButton(title: "Cancel  (Esc)", target: self, action: #selector(handleCancelClick))
+        btn.bezelStyle = .rounded
+        btn.controlSize = .regular
+        btn.font = .systemFont(ofSize: 13, weight: .medium)
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(btn)
+        NSLayoutConstraint.activate([
+            btn.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            btn.topAnchor.constraint(equalTo: topAnchor, constant: 20),
+        ])
+        cancelButton = btn
+    }
+
+    @objc private func handleCancelClick() {
+        onCancel?()
     }
 
     override func updateTrackingAreas() {
@@ -267,6 +305,10 @@ private class OverlayView: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         needsDisplay = true
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        onCancel?()
     }
 
     override func keyDown(with event: NSEvent) {

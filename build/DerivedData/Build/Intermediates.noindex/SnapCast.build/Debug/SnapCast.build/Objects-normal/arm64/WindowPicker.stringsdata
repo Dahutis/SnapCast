@@ -1,0 +1,48 @@
+{
+  "source": "/Users/personal/Documents/NxCapture/SnapCast/Selection/WindowPicker.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Select Window",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 246
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search apps and windows…",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 255
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 279
+        }
+      },
+      {
+        "comment": "",
+        "key": "No matching windows",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 302
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 396
+        }
+      }
+    ]
+  },
+  "version": 1
+}

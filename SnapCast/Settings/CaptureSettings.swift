@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 class CaptureSettings: ObservableObject {
     @Published var captureType: CaptureType {
@@ -65,6 +66,46 @@ class CaptureSettings: ObservableObject {
     @Published var outputFolderPath: String {
         didSet { UserDefaults.standard.set(outputFolderPath, forKey: "outputFolderPath") }
     }
+    @Published var copyToClipboard: Bool {
+        didSet { UserDefaults.standard.set(copyToClipboard, forKey: "copyToClipboard") }
+    }
+    @Published var showCaptureToast: Bool {
+        didSet { UserDefaults.standard.set(showCaptureToast, forKey: "showCaptureToast") }
+    }
+    @Published var shortcuts: [String: ShortcutBinding] {
+        didSet {
+            if let data = try? JSONEncoder().encode(shortcuts) {
+                UserDefaults.standard.set(data, forKey: "shortcuts")
+            }
+        }
+    }
+
+    func binding(for action: ShortcutAction) -> Binding<ShortcutBinding?> {
+        Binding(
+            get: { self.shortcuts[action.rawValue] },
+            set: { newValue in
+                if let value = newValue {
+                    self.shortcuts[action.rawValue] = value
+                } else {
+                    self.shortcuts.removeValue(forKey: action.rawValue)
+                }
+            }
+        )
+    }
+
+    func resetShortcuts() {
+        shortcuts = Self.defaultShortcuts
+    }
+
+    private static var defaultShortcuts: [String: ShortcutBinding] {
+        var dict: [String: ShortcutBinding] = [:]
+        for action in ShortcutAction.allCases {
+            if let def = action.defaultBinding {
+                dict[action.rawValue] = def
+            }
+        }
+        return dict
+    }
 
     var outputFolder: URL {
         URL(fileURLWithPath: outputFolderPath)
@@ -94,6 +135,14 @@ class CaptureSettings: ObservableObject {
         self.loopCount = defaults.object(forKey: "loopCount") as? Int ?? 0
         self.outputFolderPath = defaults.string(forKey: "outputFolderPath")
             ?? NSHomeDirectory() + "/Desktop"
+        self.copyToClipboard = defaults.object(forKey: "copyToClipboard") as? Bool ?? false
+        self.showCaptureToast = defaults.object(forKey: "showCaptureToast") as? Bool ?? true
+        if let data = defaults.data(forKey: "shortcuts"),
+           let saved = try? JSONDecoder().decode([String: ShortcutBinding].self, from: data) {
+            self.shortcuts = saved
+        } else {
+            self.shortcuts = Self.defaultShortcuts
+        }
     }
 
     func outputFileURL(extension ext: String) -> URL {

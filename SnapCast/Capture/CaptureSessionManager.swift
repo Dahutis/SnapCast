@@ -3,6 +3,23 @@ import ScreenCaptureKit
 import CoreMedia
 import Combine
 
+enum ClipboardHelper {
+    /// Copies an exported capture to the general pasteboard. Always writes the
+    /// file URL (paste into Finder, Mail, Slack, Notion, Messages, etc.). For
+    /// non-animated images, also writes the bitmap so image editors (Photoshop,
+    /// Preview "New from Clipboard") accept a paste. GIFs skip the bitmap path
+    /// because NSImage round-tripping through the pasteboard loses animation.
+    static func copyExportedFile(at url: URL, isAnimated: Bool) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        var items: [NSPasteboardWriting] = [url as NSURL]
+        if !isAnimated, let image = NSImage(contentsOf: url) {
+            items.append(image)
+        }
+        pb.writeObjects(items)
+    }
+}
+
 @MainActor
 class CaptureSessionManager: NSObject, ObservableObject {
     @Published var isRecording = false
@@ -38,7 +55,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
     // MARK: - Public API
 
-    func startCapture() {
+    func startCapture(mode: CaptureMode? = nil) {
         guard !isRecording else { return }
 
         exportError = nil
@@ -47,6 +64,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
         // Close the popover before starting
         onCaptureStarting?()
 
+        let resolvedMode = mode ?? settings.captureMode
         let delay = settings.captureDelay
         if delay > 0 {
             var remaining = delay
@@ -56,12 +74,12 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     timer.invalidate()
                     Task { @MainActor [weak self] in
                         self?.delayTimer = nil
-                        self?.beginCapture()
+                        self?.beginCapture(mode: resolvedMode)
                     }
                 }
             }
         } else {
-            beginCapture()
+            beginCapture(mode: resolvedMode)
         }
     }
 
@@ -89,7 +107,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
     // MARK: - Screenshot
 
-    func takeScreenshot() {
+    func takeScreenshot(mode overrideMode: ScreenshotMode? = nil) {
         guard !isRecording, !isTakingScreenshot else { return }
 
         exportError = nil
@@ -98,7 +116,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
         onCaptureStarting?()
         isTakingScreenshot = true
 
-        let mode = settings.screenshotMode
+        let mode = overrideMode ?? settings.screenshotMode
         if mode == .fullPage {
             scrollProgress = "Loading page..."
         }
@@ -107,6 +125,12 @@ class CaptureSessionManager: NSObject, ObservableObject {
             do {
                 let url = try await ScreenshotCapture.capture(mode: mode, settings: settings)
                 self.lastExportedURL = url
+                if self.settings.copyToClipboard {
+                    ClipboardHelper.copyExportedFile(at: url, isAnimated: false)
+                }
+                if self.settings.showCaptureToast {
+                    CaptureToast.shared.show(imageURL: url)
+                }
                 self.isTakingScreenshot = false
                 self.scrollProgress = nil
             } catch let error as ScreenshotError where error.errorDescription == "Screenshot cancelled" {
@@ -202,6 +226,12 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
                 await MainActor.run {
                     self.lastExportedURL = url
+                    if settings.copyToClipboard {
+                        ClipboardHelper.copyExportedFile(at: url, isAnimated: false)
+                    }
+                    if settings.showCaptureToast {
+                        CaptureToast.shared.show(imageURL: url)
+                    }
                     self.isExporting = false
                     self.isMergerActive = false
                     self.mergerCaptures = []
@@ -222,14 +252,14 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
     // MARK: - Private
 
-    private func beginCapture() {
+    private func beginCapture(mode: CaptureMode) {
         Task {
             do {
                 let filter: SCContentFilter
                 let captureWidth: Int
                 let captureHeight: Int
 
-                switch settings.captureMode {
+                switch mode {
                 case .region:
                     guard let result = await RegionSelectionOverlay.selectRegion() else { return }
                     let display = result.display
@@ -286,8 +316,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     outputHeight = captureHeight
                 }
 
-                config.width = settings.captureMode == .region ? captureWidth : outputWidth
-                config.height = settings.captureMode == .region ? captureHeight : outputHeight
+                config.width = mode == .region ? captureWidth : outputWidth
+                config.height = mode == .region ? captureHeight : outputHeight
                 config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(settings.fps))
                 config.showsCursor = settings.captureCursor
                 config.pixelFormat = kCVPixelFormatType_32BGRA
@@ -361,6 +391,12 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
                 await MainActor.run {
                     self.lastExportedURL = url
+                    if settings.copyToClipboard {
+                        ClipboardHelper.copyExportedFile(at: url, isAnimated: true)
+                    }
+                    if settings.showCaptureToast {
+                        CaptureToast.shared.show(imageURL: url)
+                    }
                     self.isExporting = false
                 }
             } catch {

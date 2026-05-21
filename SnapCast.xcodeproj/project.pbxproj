@@ -7,26 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A100000001 /* SnapCastApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000001; };
-		A100000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000002; };
-		A100000003 /* CaptureMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000003; };
-		A100000004 /* CaptureSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000004; };
-		A100000005 /* FrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000005; };
-		A100000006 /* RegionSelectionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000006; };
-		A100000007 /* WindowPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000007; };
-		A100000008 /* EncoderProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000008; };
-		A100000009 /* GIFEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000009; };
-		A100000010 /* AVIFEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000010; };
-		A100000011 /* CaptureSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000011; };
-		A100000012 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000012; };
-		A100000013 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000013; };
-		A100000014 /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000014; };
-		A100000015 /* ScreenPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000015; };
-		A100000016 /* KeyboardShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000016; };
-		A100000017 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B100000017; };
-		A100000018 /* ScreenshotCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000020; };
-		A100000019 /* FullPageCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000021; };
-		A100000022 /* MergerStitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000024; };
+		A100000001 /* SnapCastApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000001 /* SnapCastApp.swift */; };
+		A100000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000002 /* AppDelegate.swift */; };
+		A100000003 /* CaptureMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000003 /* CaptureMode.swift */; };
+		A100000004 /* CaptureSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000004 /* CaptureSessionManager.swift */; };
+		A100000005 /* FrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000005 /* FrameProcessor.swift */; };
+		A100000006 /* RegionSelectionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000006 /* RegionSelectionOverlay.swift */; };
+		A100000007 /* WindowPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000007 /* WindowPicker.swift */; };
+		A100000008 /* EncoderProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000008 /* EncoderProtocol.swift */; };
+		A100000009 /* GIFEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000009 /* GIFEncoder.swift */; };
+		A100000010 /* AVIFEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000010 /* AVIFEncoder.swift */; };
+		A100000011 /* CaptureSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000011 /* CaptureSettings.swift */; };
+		A100000012 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000012 /* SettingsView.swift */; };
+		A100000013 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000013 /* MenuBarController.swift */; };
+		A100000014 /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000014 /* PopoverView.swift */; };
+		A100000015 /* ScreenPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000015 /* ScreenPermissions.swift */; };
+		A100000016 /* KeyboardShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000016 /* KeyboardShortcuts.swift */; };
+		A100000017 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B100000017 /* Assets.xcassets */; };
+		A100000018 /* ScreenshotCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000020 /* ScreenshotCapture.swift */; };
+		A100000019 /* FullPageCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000021 /* FullPageCapture.swift */; };
+		A100000020 /* CaptureToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000022 /* CaptureToast.swift */; };
+		A100000022 /* MergerStitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000024 /* MergerStitcher.swift */; };
+		A100000023 /* AccessibilityPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000023 /* AccessibilityPermissions.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,7 +53,9 @@
 		B100000019 /* SnapCast.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnapCast.entitlements; sourceTree = "<group>"; };
 		B100000020 /* ScreenshotCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCapture.swift; sourceTree = "<group>"; };
 		B100000021 /* FullPageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullPageCapture.swift; sourceTree = "<group>"; };
+		B100000022 /* CaptureToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureToast.swift; sourceTree = "<group>"; };
 		B100000024 /* MergerStitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergerStitcher.swift; sourceTree = "<group>"; };
+		B100000023 /* AccessibilityPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissions.swift; sourceTree = "<group>"; };
 		C100000001 /* SnapCast.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapCast.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -66,7 +70,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		E100000001 /* Root */ = {
+		E100000001 = {
 			isa = PBXGroup;
 			children = (
 				E100000002 /* SnapCast */,
@@ -162,7 +166,9 @@
 			isa = PBXGroup;
 			children = (
 				B100000015 /* ScreenPermissions.swift */,
+				B100000023 /* AccessibilityPermissions.swift */,
 				B100000016 /* KeyboardShortcuts.swift */,
+				B100000022 /* CaptureToast.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -210,7 +216,7 @@
 				en,
 				Base,
 			);
-			mainGroup = E100000001 /* Root */;
+			mainGroup = E100000001;
 			productRefGroup = E100000009 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -252,9 +258,11 @@
 				A100000014 /* PopoverView.swift in Sources */,
 				A100000015 /* ScreenPermissions.swift in Sources */,
 				A100000016 /* KeyboardShortcuts.swift in Sources */,
+				A100000020 /* CaptureToast.swift in Sources */,
 				A100000018 /* ScreenshotCapture.swift in Sources */,
 				A100000019 /* FullPageCapture.swift in Sources */,
 				A100000022 /* MergerStitcher.swift in Sources */,
+				A100000023 /* AccessibilityPermissions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -382,9 +390,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SnapCast/SnapCast.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8T9RVGUF2N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SnapCast/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -406,9 +416,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SnapCast/SnapCast.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8T9RVGUF2N;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SnapCast/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -447,7 +459,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
 	};
 	rootObject = H100000001 /* Project object */;
 }
