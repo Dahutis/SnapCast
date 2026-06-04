@@ -48,14 +48,36 @@ class CaptureSessionManager: NSObject, ObservableObject {
     private var delayTimer: Timer?
     private var cropRect: CGRect?
 
+    /// Active annotation session for the current recording (if any). Kept on
+    /// the manager so the canvas stays alive for the entire recording and the
+    /// palette's Stop button can route through us.
+    private var annotationSession: AnnotationSession?
+
     init(settings: CaptureSettings) {
         self.settings = settings
         super.init()
     }
 
+    // MARK: - Export finishing
+
+    /// Single tail for every capture path: record the URL, optionally copy to
+    /// the clipboard, show the toast, and open the post-process editor.
+    func finishExport(url: URL, isAnimated: Bool) {
+        lastExportedURL = url
+        if settings.copyToClipboard {
+            ClipboardHelper.copyExportedFile(at: url, isAnimated: isAnimated)
+        }
+        if settings.showCaptureToast {
+            CaptureToast.shared.show(imageURL: url)
+        }
+        if settings.openEditorAfterCapture {
+            PostProcessController.shared.open(url: url)
+        }
+    }
+
     // MARK: - Public API
 
-    func startCapture(mode: CaptureMode? = nil) {
+    func startCapture(mode: CaptureMode? = nil, forceAnnotate: Bool = false) {
         guard !isRecording else { return }
 
         exportError = nil
@@ -74,12 +96,12 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     timer.invalidate()
                     Task { @MainActor [weak self] in
                         self?.delayTimer = nil
-                        self?.beginCapture(mode: resolvedMode)
+                        self?.beginCapture(mode: resolvedMode, forceAnnotate: forceAnnotate)
                     }
                 }
             }
         } else {
-            beginCapture(mode: resolvedMode)
+            beginCapture(mode: resolvedMode, forceAnnotate: forceAnnotate)
         }
     }
 
@@ -93,6 +115,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
     func cancelCapture() {
         delayTimer?.invalidate()
         delayTimer = nil
+        annotationSession?.dismiss()
+        annotationSession = nil
         if isRecording {
             Task {
                 try? await stream?.stopCapture()
@@ -107,7 +131,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
     // MARK: - Screenshot
 
-    func takeScreenshot(mode overrideMode: ScreenshotMode? = nil) {
+    func takeScreenshot(mode overrideMode: ScreenshotMode? = nil, forceAnnotate: Bool = false) {
         guard !isRecording, !isTakingScreenshot else { return }
 
         exportError = nil
@@ -123,14 +147,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
         Task {
             do {
-                let url = try await ScreenshotCapture.capture(mode: mode, settings: settings)
-                self.lastExportedURL = url
-                if self.settings.copyToClipboard {
-                    ClipboardHelper.copyExportedFile(at: url, isAnimated: false)
-                }
-                if self.settings.showCaptureToast {
-                    CaptureToast.shared.show(imageURL: url)
-                }
+                let url = try await ScreenshotCapture.capture(mode: mode, settings: settings, forceAnnotate: forceAnnotate)
+                self.finishExport(url: url, isAnimated: false)
                 self.isTakingScreenshot = false
                 self.scrollProgress = nil
             } catch let error as ScreenshotError where error.errorDescription == "Screenshot cancelled" {
@@ -225,13 +243,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 let url = try ScreenshotCapture.saveImage(final_, settings: settings)
 
                 await MainActor.run {
-                    self.lastExportedURL = url
-                    if settings.copyToClipboard {
-                        ClipboardHelper.copyExportedFile(at: url, isAnimated: false)
-                    }
-                    if settings.showCaptureToast {
-                        CaptureToast.shared.show(imageURL: url)
-                    }
+                    self.finishExport(url: url, isAnimated: false)
                     self.isExporting = false
                     self.isMergerActive = false
                     self.mergerCaptures = []
@@ -252,12 +264,20 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
     // MARK: - Private
 
-    private func beginCapture(mode: CaptureMode) {
+    private func beginCapture(mode: CaptureMode, forceAnnotate: Bool = false) {
         Task {
             do {
                 let filter: SCContentFilter
                 let captureWidth: Int
                 let captureHeight: Int
+
+                // Annotation target rect (NSScreen global coords) — set
+                // alongside each mode's selection so we know where to anchor
+                // the canvas window. Window mode is intentionally skipped for
+                // annotation; the window can be moved/resized mid-recording
+                // and tracking that is a separate design problem.
+                var annotationTargetRect: NSRect?
+                var annotationScreen: NSScreen?
 
                 switch mode {
                 case .region:
@@ -272,6 +292,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     )
                     captureWidth = display.width
                     captureHeight = display.height
+                    annotationTargetRect = result.globalRect
+                    annotationScreen = result.screen
 
                 case .window:
                     guard let window = await WindowPicker.pickWindow() else { return }
@@ -293,6 +315,37 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     captureWidth = display.width
                     captureHeight = display.height
                     self.cropRect = nil
+
+                    if let screen = NSScreen.screens.first(where: {
+                        let id = $0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
+                        return id == display.displayID
+                    }) ?? NSScreen.main {
+                        annotationTargetRect = screen.frame
+                        annotationScreen = screen
+                    }
+                }
+
+                // Annotation pre-pass: if enabled and we have a target rect,
+                // present the canvas + palette and wait for the user to
+                // either click Start Recording or cancel. The session stays
+                // alive past this point — `enterRecordingMode()` happens once
+                // the SCKit stream is up, and `dismiss()` is called in
+                // finalize/cancel.
+                if (forceAnnotate || settings.annotateBeforeCapture),
+                   let rect = annotationTargetRect,
+                   let screen = annotationScreen {
+                    let session = AnnotationSession(
+                        targetRect: rect,
+                        screen: screen,
+                        isRecordingMode: true
+                    )
+                    session.onStopRequested = { [weak self] in self?.stopCapture() }
+                    let outcome = await session.present()
+                    if outcome == .cancel {
+                        session.dismiss()
+                        return
+                    }
+                    self.annotationSession = session
                 }
 
                 let config = SCStreamConfiguration()
@@ -339,11 +392,17 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 self.elapsedTime = 0
                 self.startTime = Date()
 
+                // Stream is live — flip the annotation palette into its
+                // recording layout (Stop button + timer). Canvas keeps
+                // accepting strokes the whole time.
+                self.annotationSession?.enterRecordingMode()
+
                 timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in
                         guard let self = self, let start = self.startTime else { return }
                         self.elapsedTime = Date().timeIntervalSince(start)
                         self.capturedFrameCount = self.frameProcessor?.frameCount ?? 0
+                        self.annotationSession?.updateElapsed(self.elapsedTime)
 
                         if self.elapsedTime >= Double(self.settings.maxDuration) {
                             self.stopCapture()
@@ -353,6 +412,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
             } catch {
                 exportError = "Capture failed: \(error.localizedDescription)"
+                annotationSession?.dismiss()
+                annotationSession = nil
             }
         }
     }
@@ -368,6 +429,12 @@ class CaptureSessionManager: NSObject, ObservableObject {
         }
         stream = nil
         isRecording = false
+
+        // Tear down the annotation overlay once the stream has stopped — the
+        // last frame's already been pushed to the processor by this point, so
+        // dismissing now won't drop trailing strokes.
+        annotationSession?.dismiss()
+        annotationSession = nil
 
         guard let processor = frameProcessor, !processor.frames.isEmpty else {
             exportError = "No frames captured"
@@ -390,13 +457,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 )
 
                 await MainActor.run {
-                    self.lastExportedURL = url
-                    if settings.copyToClipboard {
-                        ClipboardHelper.copyExportedFile(at: url, isAnimated: true)
-                    }
-                    if settings.showCaptureToast {
-                        CaptureToast.shared.show(imageURL: url)
-                    }
+                    self.finishExport(url: url, isAnimated: true)
                     self.isExporting = false
                 }
             } catch {

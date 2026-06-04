@@ -3,7 +3,13 @@ import ScreenCaptureKit
 
 struct RegionSelectionResult {
     let display: SCDisplay
+    /// Rect in SCKit display coordinates (top-left origin, local to display).
     let rect: CGRect
+    /// Backing NSScreen — needed to position overlay windows in global coords.
+    let screen: NSScreen
+    /// Rect in NSScreen global coordinates (bottom-left origin) — convenient
+    /// for positioning NSWindows over the same area without re-flipping Y.
+    let globalRect: CGRect
 }
 
 class RegionSelectionOverlay {
@@ -31,6 +37,10 @@ private class OverlayController {
     var views: [OverlayView] = []
     let completion: (RegionSelectionResult?) -> Void
     private var hasCompleted = false
+    /// App-local Esc monitor — needed because on multi-display setups only one
+    /// overlay window can be `key`, so keyDown on the others would otherwise be
+    /// dropped. The monitor catches Esc regardless of which screen has focus.
+    private var keyMonitor: Any?
 
     init(completion: @escaping (RegionSelectionResult?) -> Void) {
         self.completion = completion
@@ -84,12 +94,27 @@ private class OverlayController {
             first.makeFirstResponder(firstView)
         }
 
+        // Global Esc fallback — on multi-display setups, only the primary
+        // overlay is key, so the other screens' views never see keyDown.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 {
+                self?.finish(rect: nil, screen: nil)
+                return nil
+            }
+            return event
+        }
+
         NSApp.activate(ignoringOtherApps: true)
     }
 
     func finish(rect: CGRect?, screen: NSScreen?) {
         guard !hasCompleted else { return }
         hasCompleted = true
+
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
 
         for w in windows {
             w.orderOut(nil)
@@ -114,7 +139,9 @@ private class OverlayController {
                     return
                 }
 
-                // Convert from NSView coords (bottom-left origin) to SCKit coords (top-left origin)
+                // Convert from NSView coords (bottom-left origin, local to the
+                // overlay window which fills the screen) to SCKit coords
+                // (top-left origin, local to display).
                 let screenFrame = screen.frame
                 let flippedY = screenFrame.height - rect.origin.y - rect.height
                 let displayRect = CGRect(
@@ -124,7 +151,21 @@ private class OverlayController {
                     height: rect.height
                 )
 
-                self.completion(RegionSelectionResult(display: display, rect: displayRect))
+                // Global NSScreen coords (bottom-left origin, anchored to the
+                // main-display global frame) for positioning NSWindows.
+                let globalRect = CGRect(
+                    x: screenFrame.origin.x + rect.origin.x,
+                    y: screenFrame.origin.y + rect.origin.y,
+                    width: rect.width,
+                    height: rect.height
+                )
+
+                self.completion(RegionSelectionResult(
+                    display: display,
+                    rect: displayRect,
+                    screen: screen,
+                    globalRect: globalRect
+                ))
             } catch {
                 self.completion(nil)
             }
@@ -157,6 +198,10 @@ private class OverlayView: NSView {
     private var cancelButton: NSButton?
 
     override var acceptsFirstResponder: Bool { true }
+    /// Mirror of OverlayWindow.acceptsFirstMouse — ensures the very first
+    /// mouseDown on a non-key overlay (e.g. on a secondary display) reaches
+    /// this view instead of being swallowed by AppKit's key-window switch.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -278,6 +323,10 @@ private class OverlayView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        // Pull focus to whichever screen the user actually clicked on — so
+        // Esc and other keyDowns from this point on land on the same overlay.
+        window?.makeKeyAndOrderFront(nil)
+        window?.makeFirstResponder(self)
         startPoint = convert(event.locationInWindow, from: nil)
         currentPoint = startPoint
         isDragging = true

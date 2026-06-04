@@ -72,6 +72,14 @@ class CaptureSettings: ObservableObject {
     @Published var showCaptureToast: Bool {
         didSet { UserDefaults.standard.set(showCaptureToast, forKey: "showCaptureToast") }
     }
+    @Published var annotateBeforeCapture: Bool {
+        didSet { UserDefaults.standard.set(annotateBeforeCapture, forKey: "annotateBeforeCapture") }
+    }
+    /// When true, the post-process editor opens automatically after each
+    /// capture instead of (or in addition to) firing the toast.
+    @Published var openEditorAfterCapture: Bool {
+        didSet { UserDefaults.standard.set(openEditorAfterCapture, forKey: "openEditorAfterCapture") }
+    }
     @Published var shortcuts: [String: ShortcutBinding] {
         didSet {
             if let data = try? JSONEncoder().encode(shortcuts) {
@@ -135,8 +143,10 @@ class CaptureSettings: ObservableObject {
         self.loopCount = defaults.object(forKey: "loopCount") as? Int ?? 0
         self.outputFolderPath = defaults.string(forKey: "outputFolderPath")
             ?? NSHomeDirectory() + "/Desktop"
-        self.copyToClipboard = defaults.object(forKey: "copyToClipboard") as? Bool ?? false
+        self.copyToClipboard = defaults.object(forKey: "copyToClipboard") as? Bool ?? true
         self.showCaptureToast = defaults.object(forKey: "showCaptureToast") as? Bool ?? true
+        self.annotateBeforeCapture = defaults.object(forKey: "annotateBeforeCapture") as? Bool ?? false
+        self.openEditorAfterCapture = defaults.object(forKey: "openEditorAfterCapture") as? Bool ?? false
         if let data = defaults.data(forKey: "shortcuts"),
            let saved = try? JSONDecoder().decode([String: ShortcutBinding].self, from: data) {
             self.shortcuts = saved

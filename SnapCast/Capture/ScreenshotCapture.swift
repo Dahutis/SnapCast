@@ -8,16 +8,17 @@ class ScreenshotCapture {
 
     /// Captures a single screenshot based on the given mode and settings, saves to disk, returns the file URL.
     @MainActor
-    static func capture(mode: ScreenshotMode, settings: CaptureSettings) async throws -> URL {
+    static func capture(mode: ScreenshotMode, settings: CaptureSettings, forceAnnotate: Bool = false) async throws -> URL {
         let image: CGImage
+        let annotate = forceAnnotate || settings.annotateBeforeCapture
 
         switch mode {
         case .region:
-            image = try await captureRegion(settings: settings)
+            image = try await captureRegion(settings: settings, annotate: annotate)
         case .window:
             image = try await captureWindow(settings: settings)
         case .fullScreen:
-            image = try await captureFullScreen(settings: settings)
+            image = try await captureFullScreen(settings: settings, annotate: annotate)
         case .fullPage:
             return try await FullPageCapture.capture(url: settings.fullPageURL, settings: settings)
         }
@@ -29,13 +30,36 @@ class ScreenshotCapture {
     // MARK: - Region
 
     @MainActor
-    private static func captureRegion(settings: CaptureSettings) async throws -> CGImage {
+    private static func captureRegion(settings: CaptureSettings, annotate: Bool) async throws -> CGImage {
         guard let result = await RegionSelectionOverlay.selectRegion() else {
             throw ScreenshotError.cancelled
         }
 
         let display = result.display
         let rect = result.rect
+
+        // Annotation overlay (if enabled): show canvas + palette over the
+        // selected region, wait for the user to draw and click Done. The
+        // canvas stays on screen during capture so the strokes land in the
+        // SCKit frame naturally — only the palette is hidden first to keep
+        // the floating UI out of the captured image.
+        let annotation: AnnotationSession?
+        if annotate {
+            let session = AnnotationSession(
+                targetRect: result.globalRect,
+                screen: result.screen
+            )
+            let outcome = await session.present()
+            if outcome == .cancel {
+                session.dismiss()
+                throw ScreenshotError.cancelled
+            }
+            session.hidePalette()
+            annotation = session
+        } else {
+            annotation = nil
+        }
+        defer { annotation?.dismiss() }
 
         let filter = SCContentFilter(display: display, excludingWindows: [])
         let config = SCStreamConfiguration()
@@ -86,10 +110,30 @@ class ScreenshotCapture {
     // MARK: - Full Screen
 
     @MainActor
-    private static func captureFullScreen(settings: CaptureSettings) async throws -> CGImage {
+    private static func captureFullScreen(settings: CaptureSettings, annotate: Bool) async throws -> CGImage {
         guard let (display, excludedWindows) = await WindowPicker.pickDisplay() else {
             throw ScreenshotError.cancelled
         }
+
+        // For full-screen captures we anchor the annotation canvas to the
+        // NSScreen backing `display`. Pre-canvas excludedWindows already
+        // omits the canvas (it doesn't exist yet at this point), so the
+        // canvas's strokes land in the captured frame.
+        let annotation: AnnotationSession?
+        if annotate,
+           let screen = matchingScreen(for: display) {
+            let session = AnnotationSession(targetRect: screen.frame, screen: screen)
+            let outcome = await session.present()
+            if outcome == .cancel {
+                session.dismiss()
+                throw ScreenshotError.cancelled
+            }
+            session.hidePalette()
+            annotation = session
+        } else {
+            annotation = nil
+        }
+        defer { annotation?.dismiss() }
 
         let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
         let config = SCStreamConfiguration()
@@ -99,6 +143,15 @@ class ScreenshotCapture {
         config.showsCursor = settings.captureCursor
 
         return try await captureSingleFrame(filter: filter, configuration: config)
+    }
+
+    /// Finds the NSScreen whose backing display matches the given SCDisplay.
+    private static func matchingScreen(for display: SCDisplay) -> NSScreen? {
+        for screen in NSScreen.screens {
+            let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
+            if id == display.displayID { return screen }
+        }
+        return NSScreen.main
     }
 
     // MARK: - Single Frame Capture

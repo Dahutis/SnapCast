@@ -11,7 +11,7 @@ struct PopoverView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
+            HStack(spacing: 8) {
                 if showingSettings {
                     Button(action: { showingSettings = false }) {
                         Image(systemName: "chevron.left")
@@ -22,6 +22,7 @@ struct PopoverView: View {
                     .font(.headline)
                 Spacer()
                 if !showingSettings {
+                    annotateChip
                     Button(action: { showingSettings = true }) {
                         Image(systemName: "gear")
                     }
@@ -642,6 +643,8 @@ struct PopoverView: View {
                         .font(.caption)
                     Toggle("Show Preview Toast", isOn: $settings.showCaptureToast)
                         .font(.caption)
+                    Toggle("Open Editor After Capture", isOn: $settings.openEditorAfterCapture)
+                        .font(.caption)
                     Toggle("Resize", isOn: $settings.resizeEnabled)
                         .font(.caption)
                     if settings.resizeEnabled {
@@ -791,6 +794,34 @@ struct PopoverView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// Compact toggle chip in the popover header. Tapping flips
+    /// `annotateBeforeCapture` so the very next screenshot opens the
+    /// annotation canvas after region/full-screen selection.
+    private var annotateChip: some View {
+        Button(action: { settings.annotateBeforeCapture.toggle() }) {
+            HStack(spacing: 4) {
+                Image(systemName: "pencil.tip")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("Annotate")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule().fill(
+                    settings.annotateBeforeCapture
+                        ? Color.accentColor.opacity(0.85)
+                        : Color.primary.opacity(0.08)
+                )
+            )
+            .foregroundColor(settings.annotateBeforeCapture ? .white : .secondary)
+        }
+        .buttonStyle(.plain)
+        .help(settings.annotateBeforeCapture
+              ? "Annotation canvas will appear before capture"
+              : "Enable to draw on the screen before capture")
     }
 
     private func statusIcon(isGranted: Bool, needsRelaunch: Bool) -> String {

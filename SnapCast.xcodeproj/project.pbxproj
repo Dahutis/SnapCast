@@ -29,6 +29,15 @@
 		A100000020 /* CaptureToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000022 /* CaptureToast.swift */; };
 		A100000022 /* MergerStitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000024 /* MergerStitcher.swift */; };
 		A100000023 /* AccessibilityPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000023 /* AccessibilityPermissions.swift */; };
+		A100000025 /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000025 /* AnnotationModel.swift */; };
+		A100000026 /* AnnotationCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000026 /* AnnotationCanvas.swift */; };
+		A100000027 /* AnnotationToolPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000027 /* AnnotationToolPaletteView.swift */; };
+		A100000028 /* AnnotationSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000028 /* AnnotationSession.swift */; };
+		A100000029 /* AnnotationRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000029 /* AnnotationRenderer.swift */; };
+		A100000030 /* EditorDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030 /* EditorDocument.swift */; };
+		A100000031 /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031 /* EditorCanvasView.swift */; };
+		A100000032 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000032 /* EditorView.swift */; };
+		A100000033 /* PostProcessController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000033 /* PostProcessController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +65,15 @@
 		B100000022 /* CaptureToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureToast.swift; sourceTree = "<group>"; };
 		B100000024 /* MergerStitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergerStitcher.swift; sourceTree = "<group>"; };
 		B100000023 /* AccessibilityPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissions.swift; sourceTree = "<group>"; };
+		B100000025 /* AnnotationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationModel.swift; sourceTree = "<group>"; };
+		B100000026 /* AnnotationCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCanvas.swift; sourceTree = "<group>"; };
+		B100000027 /* AnnotationToolPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationToolPaletteView.swift; sourceTree = "<group>"; };
+		B100000028 /* AnnotationSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationSession.swift; sourceTree = "<group>"; };
+		B100000029 /* AnnotationRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationRenderer.swift; sourceTree = "<group>"; };
+		B100000030 /* EditorDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorDocument.swift; sourceTree = "<group>"; };
+		B100000031 /* EditorCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCanvasView.swift; sourceTree = "<group>"; };
+		B100000032 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		B100000033 /* PostProcessController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostProcessController.swift; sourceTree = "<group>"; };
 		C100000001 /* SnapCast.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapCast.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -90,6 +108,8 @@
 				E100000006 /* Selection */,
 				E100000007 /* Encoding */,
 				E100000008 /* Settings */,
+				E10000000B /* Annotation */,
+				E10000000C /* PostProcess */,
 				E10000000A /* Utilities */,
 			);
 			path = SnapCast;
@@ -171,6 +191,29 @@
 				B100000022 /* CaptureToast.swift */,
 			);
 			path = Utilities;
+			sourceTree = "<group>";
+		};
+		E10000000B /* Annotation */ = {
+			isa = PBXGroup;
+			children = (
+				B100000025 /* AnnotationModel.swift */,
+				B100000026 /* AnnotationCanvas.swift */,
+				B100000027 /* AnnotationToolPaletteView.swift */,
+				B100000028 /* AnnotationSession.swift */,
+				B100000029 /* AnnotationRenderer.swift */,
+			);
+			path = Annotation;
+			sourceTree = "<group>";
+		};
+		E10000000C /* PostProcess */ = {
+			isa = PBXGroup;
+			children = (
+				B100000030 /* EditorDocument.swift */,
+				B100000031 /* EditorCanvasView.swift */,
+				B100000032 /* EditorView.swift */,
+				B100000033 /* PostProcessController.swift */,
+			);
+			path = PostProcess;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -263,6 +306,15 @@
 				A100000019 /* FullPageCapture.swift in Sources */,
 				A100000022 /* MergerStitcher.swift in Sources */,
 				A100000023 /* AccessibilityPermissions.swift in Sources */,
+				A100000025 /* AnnotationModel.swift in Sources */,
+				A100000026 /* AnnotationCanvas.swift in Sources */,
+				A100000027 /* AnnotationToolPaletteView.swift in Sources */,
+				A100000028 /* AnnotationSession.swift in Sources */,
+				A100000029 /* AnnotationRenderer.swift in Sources */,
+				A100000030 /* EditorDocument.swift in Sources */,
+				A100000031 /* EditorCanvasView.swift in Sources */,
+				A100000032 /* EditorView.swift in Sources */,
+				A100000033 /* PostProcessController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

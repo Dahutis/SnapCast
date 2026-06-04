@@ -1,0 +1,2207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SnapCast — Capture so well that editing is optional.</title>
+<style>
+  :root {
+    --bg: #07080c;
+    --bg-2: #10131a;
+    --bg-3: #161a23;
+    --panel: rgba(255,255,255,0.04);
+    --panel-2: rgba(255,255,255,0.06);
+    --panel-edge: rgba(255,255,255,0.08);
+    --panel-edge-strong: rgba(255,255,255,0.14);
+    --ink: #f4f5f7;
+    --ink-dim: rgba(244,245,247,0.62);
+    --ink-faint: rgba(244,245,247,0.38);
+    --ink-ghost: rgba(244,245,247,0.22);
+    --accent: #ffd933;
+    --accent-dim: rgba(255,217,51,0.18);
+    --red: #ff4d4d;
+    --green: #4df273;
+    --cyan: #4dd9ff;
+    --magenta: #c089ff;
+    --orange: #ffa14d;
+    --grad-1: radial-gradient(at 8% 4%, rgba(255,217,51,0.12), transparent 38%),
+              radial-gradient(at 92% 0%, rgba(77,217,255,0.10), transparent 42%),
+              radial-gradient(at 50% 30%, rgba(192,137,255,0.07), transparent 50%);
+    --shadow: 0 10px 40px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
+    --shadow-soft: 0 6px 24px rgba(0,0,0,0.32);
+    --shadow-strong: 0 30px 80px rgba(0,0,0,0.55), 0 6px 20px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    font-feature-settings: "ss01", "ss02", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: var(--bg) var(--grad-1);
+    background-attachment: fixed;
+    overflow-x: hidden;
+  }
+
+  .container {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  .container-narrow {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  /* ── HERO ───────────────────────────────────────────────────────── */
+
+  .hero {
+    padding: 112px 0 60px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before,
+  .hero::after {
+    content: "";
+    position: absolute;
+    width: 480px;
+    height: 480px;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .hero::before {
+    background: var(--accent);
+    top: -180px;
+    left: 8%;
+    animation: float-a 14s ease-in-out infinite;
+  }
+
+  .hero::after {
+    background: var(--cyan);
+    top: -220px;
+    right: 6%;
+    animation: float-b 16s ease-in-out infinite;
+  }
+
+  @keyframes float-a {
+    0%, 100% { transform: translate(0,0); }
+    50% { transform: translate(40px, 60px); }
+  }
+  @keyframes float-b {
+    0%, 100% { transform: translate(0,0); }
+    50% { transform: translate(-50px, 80px); }
+  }
+
+  .hero .container { position: relative; z-index: 1; }
+
+  .logo {
+    width: 96px;
+    height: 96px;
+    border-radius: 24px;
+    box-shadow: var(--shadow-strong);
+    margin-bottom: 32px;
+    image-rendering: -webkit-optimize-contrast;
+  }
+
+  .wordmark {
+    font-size: 76px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin: 0 0 22px;
+    line-height: 1;
+    background: linear-gradient(180deg, #ffffff 0%, #9aa0ad 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .tagline {
+    font-size: 24px;
+    color: var(--ink-dim);
+    margin: 0 auto;
+    max-width: 720px;
+    line-height: 1.4;
+    font-weight: 400;
+  }
+
+  .tagline strong {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .badge-row {
+    margin-top: 40px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    padding: 7px 13px;
+    border-radius: 100px;
+    border: 1px solid var(--panel-edge);
+    color: var(--ink-dim);
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .badge .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(77,242,115,0.6);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.85); }
+  }
+
+  /* ── CTA BUTTONS ─────────────────────────────────────────────────── */
+
+  .cta-row {
+    margin-top: 36px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 22px;
+    border-radius: 100px;
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+
+  .cta.primary {
+    background: linear-gradient(180deg, #ffffff 0%, #d8dae0 100%);
+    color: #0c0d12;
+    box-shadow: 0 8px 24px rgba(255,255,255,0.12), 0 2px 6px rgba(0,0,0,0.4);
+  }
+
+  .cta.primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 32px rgba(255,255,255,0.18), 0 2px 6px rgba(0,0,0,0.4);
+  }
+
+  .cta.primary .apple {
+    font-size: 18px;
+    margin-top: -2px;
+  }
+
+  .cta-meta {
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-left: 4px;
+  }
+
+  .cta-note {
+    text-align: center;
+    margin: 14px auto 0;
+    font-size: 12px;
+    color: var(--ink-faint);
+    max-width: 520px;
+    line-height: 1.5;
+  }
+
+  .cta-note strong {
+    color: var(--ink-dim);
+    font-weight: 600;
+  }
+
+  /* ── HERO SHOWCASE: macOS desktop with popover ──────────────────── */
+
+  .showcase {
+    margin: 64px auto 0;
+    max-width: 1080px;
+    border-radius: 18px;
+    border: 1px solid var(--panel-edge-strong);
+    background:
+      radial-gradient(at 70% 110%, rgba(192,137,255,0.18), transparent 55%),
+      radial-gradient(at 20% 110%, rgba(77,217,255,0.18), transparent 55%),
+      linear-gradient(180deg, #1a1f2c 0%, #0e1119 100%);
+    box-shadow: var(--shadow-strong);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* macOS menu bar */
+  .mac-menubar {
+    height: 28px;
+    background: rgba(20,22,28,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.85);
+    gap: 16px;
+    position: relative;
+    z-index: 3;
+  }
+
+  .mac-menubar .apple-logo {
+    font-size: 14px;
+    margin-top: -2px;
+  }
+
+  .mac-menubar .app-name { font-weight: 600; }
+
+  .mac-menubar .menu-item {
+    color: rgba(255,255,255,0.78);
+    font-size: 12px;
+  }
+
+  .mac-menubar .right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .mac-menubar .right .menubar-icon {
+    font-size: 13px;
+    color: rgba(255,255,255,0.82);
+  }
+
+  .mac-menubar .snapcast-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--accent);
+    position: relative;
+  }
+
+  .mac-menubar .snapcast-icon::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.12);
+    z-index: -1;
+  }
+
+  .mac-menubar .clock {
+    font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,0.92);
+    font-size: 12px;
+  }
+
+  /* Desktop stage where the selection happens */
+  .mac-desktop {
+    position: relative;
+    height: 540px;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 75% -10%, rgba(255,217,51,0.10), transparent 45%),
+      radial-gradient(ellipse at 20% 120%, rgba(77,217,255,0.10), transparent 50%),
+      linear-gradient(160deg, #1d2435 0%, #0a0c12 70%);
+  }
+
+  @media (max-width: 760px) {
+    .mac-desktop { height: 460px; }
+  }
+
+  /* Simulated app window in the background */
+  .desktop-window {
+    position: absolute;
+    left: 6%;
+    top: 14%;
+    width: 60%;
+    height: 64%;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .desktop-window .titlebar {
+    height: 28px;
+    background: rgba(0,0,0,0.3);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 6px;
+  }
+
+  .desktop-window .titlebar .tdot { width: 11px; height: 11px; border-radius: 50%; }
+  .desktop-window .titlebar .tdot.r { background: #ff5f56; }
+  .desktop-window .titlebar .tdot.y { background: #ffbd2e; }
+  .desktop-window .titlebar .tdot.g { background: #27c93f; }
+
+  .desktop-window .titlebar .tname {
+    margin-left: auto;
+    margin-right: auto;
+    transform: translateX(-30px);
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .desktop-window .body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .desktop-window .body div {
+    height: 14px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+  }
+
+  .desktop-window .body div:nth-child(1) { width: 70%; background: rgba(77,217,255,0.18); }
+  .desktop-window .body div:nth-child(2) { width: 90%; }
+  .desktop-window .body div:nth-child(3) { width: 60%; }
+  .desktop-window .body div:nth-child(4) { width: 80%; }
+  .desktop-window .body div:nth-child(5) { width: 50%; background: rgba(255,217,51,0.3); }
+  .desktop-window .body div:nth-child(6) { width: 78%; }
+  .desktop-window .body div:nth-child(7) { width: 65%; }
+  .desktop-window .body div:nth-child(8) { width: 88%; }
+
+  /* Selection region overlay drawn on the desktop */
+  .selection {
+    position: absolute;
+    left: 10%;
+    top: 22%;
+    width: 48%;
+    height: 50%;
+    border: 1.5px dashed rgba(255,217,51,0.85);
+    background: rgba(255,217,51,0.05);
+    border-radius: 4px;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .selection::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border: 1px solid rgba(0,0,0,0.5);
+    border-radius: 5px;
+  }
+
+  .selection .corner {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border: 1.5px solid #0a0c12;
+    border-radius: 1px;
+  }
+
+  .selection .corner.tl { top: -5px; left: -5px; }
+  .selection .corner.tr { top: -5px; right: -5px; }
+  .selection .corner.bl { bottom: -5px; left: -5px; }
+  .selection .corner.br { bottom: -5px; right: -5px; }
+
+  .selection .dim {
+    position: absolute;
+    bottom: -28px;
+    left: 0;
+    font: 11px ui-monospace, "SF Mono", Menlo, monospace;
+    color: #1a1300;
+    background: var(--accent);
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  /* The SnapCast popover floating from the menubar icon */
+  .snapcast-popover {
+    position: absolute;
+    top: 18px;
+    right: 32px;
+    width: 320px;
+    background: rgba(34,38,48,0.92);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 12px;
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4);
+    z-index: 4;
+    overflow: hidden;
+    font-size: 13px;
+  }
+
+  /* The little triangle pointer connecting popover to menubar icon */
+  .snapcast-popover::before {
+    content: "";
+    position: absolute;
+    top: -7px;
+    right: 24px;
+    width: 14px;
+    height: 14px;
+    background: rgba(34,38,48,0.92);
+    border-top: 1px solid rgba(255,255,255,0.10);
+    border-left: 1px solid rgba(255,255,255,0.10);
+    transform: rotate(45deg);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+  }
+
+  @media (max-width: 760px) {
+    .snapcast-popover {
+      right: 50%;
+      transform: translateX(50%);
+      width: min(320px, calc(100% - 32px));
+    }
+    .snapcast-popover::before { right: 50%; transform: translateX(50%) rotate(45deg); }
+    .desktop-window { display: none; }
+    .selection {
+      left: 6%; top: 50%; width: 88%; height: 30%;
+    }
+  }
+
+  /* Popover header */
+  .pop-header {
+    display: flex;
+    align-items: center;
+    padding: 14px 14px 8px;
+  }
+
+  .pop-header .ptitle {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.95);
+    letter-spacing: -0.01em;
+  }
+
+  .pop-header .pright {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pop-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: var(--accent);
+    color: #1a1300;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+
+  .pop-chip svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .pop-gear {
+    width: 16px;
+    height: 16px;
+    color: rgba(255,255,255,0.6);
+  }
+
+  /* Segmented picker (CaptureType) */
+  .pop-segmented {
+    margin: 6px 12px 0;
+    display: flex;
+    padding: 2px;
+    background: rgba(0,0,0,0.35);
+    border-radius: 7px;
+    gap: 2px;
+  }
+
+  .pop-segmented .seg {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 4px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.6);
+    font-weight: 500;
+  }
+
+  .pop-segmented .seg svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+  .pop-segmented .seg.active {
+    background: rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.98);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .pop-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 12px 0 0;
+  }
+
+  .pop-content {
+    padding: 12px;
+  }
+
+  /* Inner mode picker for the active page */
+  .pop-mode-seg {
+    display: flex;
+    padding: 2px;
+    background: rgba(0,0,0,0.35);
+    border-radius: 6px;
+    gap: 2px;
+    margin-bottom: 12px;
+  }
+
+  .pop-mode-seg .seg {
+    flex: 1;
+    text-align: center;
+    padding: 5px 4px;
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.6);
+    border-radius: 4px;
+    font-weight: 500;
+  }
+
+  .pop-mode-seg .seg.active {
+    background: rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.98);
+  }
+
+  /* FPS/Max/Delay info row */
+  .pop-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 4px 12px;
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.55);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Big red Start Recording button (matches .borderedProminent .red) */
+  .pop-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    padding: 9px;
+    background: linear-gradient(180deg, #ff5959, #e53737);
+    color: #fff;
+    border-radius: 7px;
+    font-weight: 600;
+    font-size: 13px;
+    box-shadow: 0 4px 12px rgba(229,55,55,0.4), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+
+  .pop-cta svg { width: 14px; height: 14px; }
+
+  /* iOS-style toast that slides in from corner */
+  .stage-toast {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+    width: 108px;
+    height: 78px;
+    border-radius: 11px;
+    border: 0.5px solid rgba(255,255,255,0.15);
+    background:
+      linear-gradient(135deg, rgba(255,217,51,0.55), rgba(255,77,77,0.45) 50%, rgba(192,137,255,0.4));
+    box-shadow: 0 18px 48px rgba(0,0,0,0.55);
+    overflow: hidden;
+    z-index: 5;
+    animation: toast-slide 6s ease-in-out infinite;
+  }
+
+  .stage-toast::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.22) 50%, transparent 60%);
+    animation: shimmer 3.4s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0%, 100% { transform: translateX(-60%); }
+    50% { transform: translateX(60%); }
+  }
+
+  @keyframes toast-slide {
+    0%, 8% { transform: translateX(150%); opacity: 0; }
+    18%, 78% { transform: translateX(0); opacity: 1; }
+    88%, 100% { transform: translateX(150%); opacity: 0; }
+  }
+
+  /* Animated cursor on the desktop */
+  .stage-cursor {
+    position: absolute;
+    left: 48%;
+    top: 60%;
+    width: 16px;
+    height: 22px;
+    color: #fff;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+    animation: drift 7s ease-in-out infinite;
+    z-index: 3;
+  }
+
+  @keyframes drift {
+    0%, 100% { transform: translate(0,0); }
+    25% { transform: translate(-26px, -14px); }
+    55% { transform: translate(22px, 12px); }
+    75% { transform: translate(8px, -10px); }
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── SECTION HEADERS ────────────────────────────────────────────── */
+
+  .section {
+    padding: 88px 0;
+    position: relative;
+  }
+
+  .section.tight {
+    padding: 56px 0;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--ink-faint);
+    margin: 0 0 14px;
+  }
+
+  .section-title {
+    font-size: 42px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 18px;
+    line-height: 1.1;
+    max-width: 720px;
+  }
+
+  .section-sub {
+    font-size: 18px;
+    color: var(--ink-dim);
+    max-width: 660px;
+    margin: 0 0 56px;
+    line-height: 1.55;
+  }
+
+  /* ── THREE-UP CARD GRID ─────────────────────────────────────────── */
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+
+  @media (max-width: 880px) {
+    .grid-3 { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 18px;
+    padding: 32px;
+    transition: border-color 0.2s ease, transform 0.25s ease, background 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    top: -40%;
+    left: -20%;
+    width: 70%;
+    height: 90%;
+    background: radial-gradient(circle, currentColor, transparent 65%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+    filter: blur(40px);
+  }
+
+  .card.red::before    { color: var(--red); }
+  .card.cyan::before   { color: var(--cyan); }
+  .card.violet::before { color: var(--magenta); }
+
+  .card:hover {
+    border-color: var(--panel-edge-strong);
+    transform: translateY(-4px);
+    background: var(--panel-2);
+  }
+
+  .card:hover::before {
+    opacity: 0.10;
+  }
+
+  .card .icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    font-size: 22px;
+  }
+
+  .icon.red    { background: rgba(255,77,77,0.15);  color: var(--red); }
+  .icon.cyan   { background: rgba(77,217,255,0.15); color: var(--cyan); }
+  .icon.violet { background: rgba(192,137,255,0.15);color: var(--magenta); }
+  .icon.yellow { background: rgba(255,217,51,0.15); color: var(--accent); }
+  .icon.green  { background: rgba(77,242,115,0.15); color: var(--green); }
+  .icon.orange { background: rgba(255,161,77,0.15); color: var(--orange); }
+
+  .card h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .card p {
+    font-size: 14.5px;
+    color: var(--ink-dim);
+    margin: 0 0 14px;
+    line-height: 1.6;
+  }
+
+  .card ul {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+    font-size: 13px;
+    color: var(--ink-dim);
+  }
+
+  .card ul li {
+    padding: 5px 0;
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+
+  .card ul li::before {
+    content: "›";
+    color: var(--ink-faint);
+    font-weight: 700;
+  }
+
+  /* ── FEATURE SPOTLIGHTS ─────────────────────────────────────────── */
+
+  .feature {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr;
+    gap: 72px;
+    align-items: center;
+    margin-bottom: 96px;
+  }
+
+  .feature:last-child { margin-bottom: 0; }
+
+  .feature.flip {
+    grid-template-columns: 1.25fr 1fr;
+  }
+
+  .feature.flip .feature-copy {
+    order: 2;
+  }
+
+  @media (max-width: 880px) {
+    .feature, .feature.flip { grid-template-columns: 1fr; gap: 36px; }
+    .feature.flip .feature-copy { order: 0; }
+  }
+
+  .feature h2 {
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    line-height: 1.15;
+  }
+
+  .feature p {
+    font-size: 16px;
+    color: var(--ink-dim);
+    line-height: 1.65;
+    margin: 0 0 16px;
+  }
+
+  .feature .stat-row {
+    display: flex;
+    gap: 24px;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--panel-edge);
+  }
+
+  .feature .stat {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .feature .stat .num {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+
+  .feature .stat .lbl {
+    font-size: 11px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+  }
+
+  .feature-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    margin-bottom: 14px;
+    padding: 5px 11px;
+    background: var(--accent-dim);
+    border-radius: 100px;
+  }
+
+  .feature-tag.cyan   { color: var(--cyan); background: rgba(77,217,255,0.15); }
+  .feature-tag.violet { color: var(--magenta); background: rgba(192,137,255,0.15); }
+  .feature-tag.green  { color: var(--green); background: rgba(77,242,115,0.15); }
+  .feature-tag.red    { color: var(--red); background: rgba(255,77,77,0.15); }
+
+  /* ── MOCK ILLUSTRATIONS ────────────────────────────────────────── */
+
+  .mock {
+    border-radius: 18px;
+    border: 1px solid var(--panel-edge-strong);
+    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+    padding: 24px;
+    box-shadow: var(--shadow-strong);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mock-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+
+  .mock-bar .dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+  }
+
+  .mock-bar .dot.r { background: #ff5f56; }
+  .mock-bar .dot.y { background: #ffbd2e; }
+  .mock-bar .dot.g { background: #27c93f; }
+
+  .mock-bar .url {
+    margin-left: 16px;
+    font: 11px ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--ink-faint);
+    background: rgba(0,0,0,0.4);
+    padding: 4px 10px;
+    border-radius: 6px;
+    flex: 1;
+  }
+
+  .mock-content {
+    background: var(--bg-2);
+    border-radius: 10px;
+    padding: 18px;
+    border: 1px solid var(--panel-edge);
+  }
+
+  /* Mock: full page screenshot */
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .stack > div {
+    height: 18px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.08);
+  }
+
+  .stack > div:nth-child(1) { width: 55%; background: rgba(255,217,51,0.5); }
+  .stack > div:nth-child(2) { width: 78%; }
+  .stack > div:nth-child(3) { width: 64%; }
+  .stack > div:nth-child(4) { width: 92%; }
+  .stack > div:nth-child(5) { width: 70%; }
+  .stack > div:nth-child(6) { width: 50%; }
+  .stack > div:nth-child(7) { width: 80%; }
+  .stack > div:nth-child(8) { width: 60%; }
+
+  .scroll-tag {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    font: 11px ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--cyan);
+    background: rgba(77,217,255,0.12);
+    border: 1px solid rgba(77,217,255,0.3);
+    padding: 5px 10px;
+    border-radius: 6px;
+  }
+
+  /* Mock: merger */
+  .merger {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .merger .panel {
+    height: 34px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 7px;
+    border: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 11px;
+    color: var(--ink-faint);
+    gap: 10px;
+  }
+
+  .merger .panel .num {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(192,137,255,0.25);
+    color: var(--magenta);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 10px;
+  }
+
+  .merger .panel .drag {
+    margin-left: auto;
+    color: var(--ink-ghost);
+    font-size: 14px;
+  }
+
+  .merger-direction {
+    display: flex;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 4px;
+    background: rgba(0,0,0,0.35);
+    border-radius: 8px;
+  }
+
+  .merger-direction .opt {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    padding: 6px;
+    border-radius: 5px;
+    color: var(--ink-faint);
+  }
+
+  .merger-direction .opt.active {
+    background: rgba(192,137,255,0.18);
+    color: var(--magenta);
+  }
+
+  /* Mock: annotation canvas */
+  .canvas {
+    height: 280px;
+    border-radius: 10px;
+    background:
+      radial-gradient(at 30% 30%, rgba(255,217,51,0.04), transparent 50%),
+      radial-gradient(at 70% 70%, rgba(77,217,255,0.04), transparent 50%),
+      var(--bg-2);
+    border: 1px solid var(--panel-edge);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .canvas .target {
+    position: absolute;
+    width: 120px;
+    height: 64px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px;
+    left: 16%;
+    top: 30%;
+    border: 1px solid var(--panel-edge);
+  }
+
+  .canvas .target.b {
+    left: 56%;
+    top: 50%;
+    width: 90px;
+    height: 38px;
+  }
+
+  .stroke {
+    position: absolute;
+    pointer-events: none;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+  }
+
+  .stroke svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .palette {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 12px;
+    border: 1px solid var(--panel-edge);
+  }
+
+  .palette .tool {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.06);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--ink-dim);
+  }
+
+  .palette .tool.active {
+    background: rgba(255,217,51,0.9);
+    color: #1a1300;
+  }
+
+  .palette .thickness {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .palette .thick-dot {
+    border-radius: 50%;
+    background: rgba(255,255,255,0.4);
+  }
+
+  .palette .thick-dot.s  { width: 5px;  height: 5px; }
+  .palette .thick-dot.m  { width: 9px;  height: 9px; background: var(--accent); }
+  .palette .thick-dot.l  { width: 13px; height: 13px; }
+
+  .palette .swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,0,0,0.4);
+  }
+
+  .palette .swatch.active {
+    box-shadow: 0 0 0 2px var(--ink), 0 0 0 3px rgba(255,255,255,0.2);
+  }
+
+  .palette .divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255,255,255,0.1);
+  }
+
+  .palette .done {
+    margin-left: auto;
+    padding: 5px 12px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #1a1300;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* Mock: window picker */
+  .winpicker-search {
+    height: 32px;
+    background: rgba(0,0,0,0.35);
+    border-radius: 7px;
+    border: 1px solid var(--panel-edge);
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-faint);
+    font-size: 12px;
+    margin-bottom: 14px;
+  }
+
+  .winpicker-group-header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-faint);
+    margin: 6px 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .winpicker-group-header .count {
+    background: rgba(255,255,255,0.08);
+    color: var(--ink-dim);
+    padding: 1px 7px;
+    border-radius: 100px;
+    font-size: 9px;
+  }
+
+  .winpicker-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .winpicker-tile {
+    aspect-ratio: 16/10;
+    border-radius: 7px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid var(--panel-edge);
+    padding: 7px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    font-size: 10px;
+    color: var(--ink-dim);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .winpicker-tile.selected {
+    border-color: var(--cyan);
+    background: linear-gradient(135deg, rgba(77,217,255,0.18), rgba(77,217,255,0.04));
+    box-shadow: 0 0 0 2px rgba(77,217,255,0.25);
+  }
+
+  .winpicker-tile .preview {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    background-image:
+      linear-gradient(90deg, rgba(255,255,255,0.08) 30%, transparent 30%),
+      linear-gradient(90deg, rgba(255,255,255,0.05) 50%, transparent 50%);
+    background-size: 60% 18%, 80% 18%;
+    background-repeat: no-repeat;
+    background-position: 12% 30%, 12% 60%;
+  }
+
+  /* ── SETTINGS MOCK ──────────────────────────────────────────────── */
+
+  .settings-mock {
+    display: grid;
+    gap: 14px;
+  }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--panel-edge);
+  }
+
+  .settings-row .lbl {
+    font-size: 12px;
+    color: var(--ink-dim);
+    width: 130px;
+    flex-shrink: 0;
+  }
+
+  .settings-row .slider {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 100px;
+    position: relative;
+  }
+
+  .settings-row .slider::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    border-radius: 100px;
+    background: var(--accent);
+  }
+
+  .settings-row .slider.a::after { width: 30%; }
+  .settings-row .slider.b::after { width: 55%; }
+  .settings-row .slider.c::after { width: 78%; }
+
+  .settings-row .val {
+    font: 12px ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--ink);
+    width: 60px;
+    text-align: right;
+  }
+
+  .settings-row .toggle {
+    width: 32px;
+    height: 18px;
+    background: var(--accent);
+    border-radius: 100px;
+    position: relative;
+    margin-left: auto;
+  }
+
+  .settings-row .toggle::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #1a1300;
+    top: 2px;
+    right: 2px;
+  }
+
+  .settings-row .toggle.off {
+    background: rgba(255,255,255,0.12);
+  }
+
+  .settings-row .toggle.off::after {
+    background: rgba(255,255,255,0.6);
+    left: 2px;
+    right: auto;
+  }
+
+  /* ── PHILOSOPHY ─────────────────────────────────────────────────── */
+
+  .philosophy {
+    text-align: center;
+    padding: 100px 0;
+    border-top: 1px solid var(--panel-edge);
+    border-bottom: 1px solid var(--panel-edge);
+    background: rgba(255,255,255,0.015);
+  }
+
+  .pull {
+    font-size: 40px;
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    max-width: 800px;
+    margin: 0 auto;
+    color: var(--ink);
+  }
+
+  .pull em {
+    font-style: normal;
+    background: linear-gradient(120deg, var(--accent), var(--cyan));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .pull-attr {
+    margin-top: 22px;
+    font-size: 13px;
+    color: var(--ink-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── POLISH GRID ────────────────────────────────────────────────── */
+
+  .polish-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  @media (max-width: 960px) {
+    .polish-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 640px) {
+    .polish-grid { grid-template-columns: 1fr; }
+  }
+
+  .polish-item {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 14px;
+    padding: 22px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    transition: border-color 0.2s ease;
+  }
+
+  .polish-item:hover {
+    border-color: var(--panel-edge-strong);
+  }
+
+  .polish-item .glyph {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .polish-item h4 {
+    font-size: 14.5px;
+    font-weight: 600;
+    margin: 0 0 6px;
+  }
+
+  .polish-item p {
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  /* ── HOTKEYS TABLE ──────────────────────────────────────────────── */
+
+  .hotkey-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 16px;
+    padding: 8px;
+  }
+
+  @media (max-width: 700px) {
+    .hotkey-grid { grid-template-columns: 1fr; }
+  }
+
+  .hotkey-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    transition: background 0.15s ease;
+  }
+
+  .hotkey-row:hover {
+    background: rgba(255,255,255,0.03);
+  }
+
+  .hotkey-row .keys {
+    display: inline-flex;
+    gap: 4px;
+    min-width: 110px;
+  }
+
+  .hotkey-row .label {
+    font-size: 13.5px;
+    color: var(--ink);
+    flex: 1;
+  }
+
+  .hotkey-row .sub {
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  kbd {
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+    border: 1px solid var(--panel-edge-strong);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    padding: 3px 7px;
+    font: 11px ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--ink);
+    min-width: 20px;
+    text-align: center;
+    display: inline-block;
+  }
+
+  kbd.empty {
+    color: var(--ink-faint);
+    font-style: italic;
+    background: rgba(255,255,255,0.02);
+  }
+
+  /* ── FOOTER ─────────────────────────────────────────────────────── */
+
+  footer {
+    padding: 64px 0 88px;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 12px;
+    border-top: 1px solid var(--panel-edge);
+  }
+
+  footer .footer-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  footer .footer-mark img {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+  }
+
+  footer .footer-mark span {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink-dim);
+  }
+
+  footer .links {
+    margin-top: 14px;
+    display: inline-flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  footer .links span { color: var(--ink-dim); }
+</style>
+</head>
+<body>
+
+<!-- HERO ------------------------------------------------------------ -->
+<header class="hero">
+  <div class="container">
+    <img class="logo" src="logo.png" alt="SnapCast logo" />
+    <h1 class="wordmark">SnapCast</h1>
+    <p class="tagline">
+      A macOS menu-bar capture tool for <strong>GIFs</strong>,
+      <strong>screenshots</strong>, and <strong>full-page web shots</strong>
+      &mdash; with a built-in telestrator pen so the visual is ready to ship
+      the moment you stop recording.
+    </p>
+    <div class="badge-row">
+      <span class="badge"><span class="dot"></span> In active development</span>
+      <span class="badge">macOS 13+</span>
+      <span class="badge">Native Swift · No dependencies</span>
+      <span class="badge">Menu bar only</span>
+    </div>
+
+    <div class="cta-row">
+      <a class="cta primary" href="SnapCast.dmg" download>
+        <span class="apple"></span>
+        <span>Download for macOS</span>
+      </a>
+      <span class="cta-meta">DMG · 1.5 MB · macOS 13+ · Universal</span>
+    </div>
+    <p class="cta-note">
+      Mount the DMG, drag SnapCast into Applications. First launch may need
+      <strong>right-click &rarr; Open</strong> &mdash; the build isn't notarized yet.
+    </p>
+
+    <!-- Hero showcase: a faux macOS desktop with the actual SnapCast popover -->
+    <div class="showcase">
+      <!-- macOS menu bar with SnapCast highlighted in the right cluster -->
+      <div class="mac-menubar">
+        <span class="apple-logo"></span>
+        <span class="app-name">SnapCast</span>
+        <span class="menu-item">File</span>
+        <span class="menu-item">Edit</span>
+        <span class="menu-item">View</span>
+        <span class="menu-item">Window</span>
+        <span class="menu-item">Help</span>
+        <span class="right">
+          <span class="menubar-icon">􀊵</span>
+          <span class="menubar-icon">􀙇</span>
+          <span class="snapcast-icon" title="SnapCast">
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M3 4.5C3 3.67 3.67 3 4.5 3h7C12.33 3 13 3.67 13 4.5v7c0 .83-.67 1.5-1.5 1.5h-7C3.67 13 3 12.33 3 11.5v-7zM8 6a2 2 0 100 4 2 2 0 000-4z"/></svg>
+          </span>
+          <span class="menubar-icon">􀋙</span>
+          <span class="clock">Wed 14:23</span>
+        </span>
+      </div>
+
+      <!-- Desktop area where the user is mid-capture -->
+      <div class="mac-desktop">
+
+        <!-- A background app window the user is capturing -->
+        <div class="desktop-window">
+          <div class="titlebar">
+            <span class="tdot r"></span>
+            <span class="tdot y"></span>
+            <span class="tdot g"></span>
+            <span class="tname">design-system.figma</span>
+          </div>
+          <div class="body">
+            <div></div><div></div><div></div><div></div>
+            <div></div><div></div><div></div><div></div>
+          </div>
+        </div>
+
+        <!-- The yellow dashed region selection happening on-screen -->
+        <div class="selection">
+          <span class="corner tl"></span>
+          <span class="corner tr"></span>
+          <span class="corner bl"></span>
+          <span class="corner br"></span>
+          <span class="dim">1280 × 720</span>
+        </div>
+
+        <!-- Animated cursor drifting around -->
+        <svg class="stage-cursor" viewBox="0 0 16 22">
+          <polygon points="1,1 1,18 5,14 7.5,20 10,19 7,13 13,13" fill="white" stroke="black" stroke-width="1"/>
+        </svg>
+
+        <!-- The toast preview that slides in after a capture -->
+        <div class="stage-toast"></div>
+
+        <!-- The actual SnapCast popover descending from the menubar icon -->
+        <div class="snapcast-popover">
+          <!-- Header: title, annotate chip, gear -->
+          <div class="pop-header">
+            <span class="ptitle">SnapCast</span>
+            <span class="pright">
+              <span class="pop-chip">
+                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.65 2.35a1.2 1.2 0 011.7 1.7L5 12.4l-3 .6.6-3 8.05-7.65z"/></svg>
+                Annotate
+              </span>
+              <svg class="pop-gear" viewBox="0 0 16 16" fill="currentColor"><path d="M8 5.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM6.92 1.78l.34 1.2a5 5 0 011.48 0l.34-1.2 2 .65-.27 1.22a5 5 0 011.05 1.05l1.22-.27.65 2-1.2.34a5 5 0 010 1.48l1.2.34-.65 2-1.22-.27a5 5 0 01-1.05 1.05l.27 1.22-2 .65-.34-1.2a5 5 0 01-1.48 0l-.34 1.2-2-.65.27-1.22a5 5 0 01-1.05-1.05l-1.22.27-.65-2 1.2-.34a5 5 0 010-1.48l-1.2-.34.65-2 1.22.27a5 5 0 011.05-1.05L4.92 2.43l2-.65z"/></svg>
+            </span>
+          </div>
+
+          <!-- CaptureType segmented picker: Recording / Screenshot / Merger -->
+          <div class="pop-segmented">
+            <div class="seg active">
+              <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2.5"/></svg>
+              Recording
+            </div>
+            <div class="seg">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 5h2l1-1.5h5L11.5 5h2A1.5 1.5 0 0115 6.5v5A1.5 1.5 0 0113.5 13h-11A1.5 1.5 0 011 11.5v-5A1.5 1.5 0 012.5 5zm5.5 1.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/></svg>
+              Screenshot
+            </div>
+            <div class="seg">
+              <svg viewBox="0 0 16 16" fill="currentColor"><rect x="2.5" y="3" width="11" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="3.5" y="5" width="11" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="4.5" y="7" width="11" height="7" rx="1.2" fill="currentColor" opacity="0.25"/></svg>
+              Merger
+            </div>
+          </div>
+
+          <div class="pop-divider"></div>
+
+          <div class="pop-content">
+            <!-- CaptureMode segmented (Region / Window / Full Screen) -->
+            <div class="pop-mode-seg">
+              <div class="seg active">Region</div>
+              <div class="seg">Window</div>
+              <div class="seg">Full Screen</div>
+            </div>
+
+            <!-- Meta row -->
+            <div class="pop-meta-row">
+              <span>FPS: 15</span>
+              <span>Max: 30s</span>
+              <span>Delay: 0s</span>
+            </div>
+
+            <!-- Big red Start Recording button -->
+            <div class="pop-cta">
+              <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2.5"/></svg>
+              Start Recording
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- THREE CAPTURES -------------------------------------------------- -->
+<section class="section">
+  <div class="container">
+    <p class="eyebrow">What it does</p>
+    <h2 class="section-title">Three captures, one menu bar.</h2>
+    <p class="section-sub">
+      SnapCast lives in your menu bar and stays out of the way until you
+      need it. Open the popover, pick a mode, hit a hotkey &mdash; the file
+      is on your Desktop a moment later, and a preview toast slides into
+      the corner so you can confirm without alt-tabbing.
+    </p>
+
+    <div class="grid-3">
+      <div class="card red">
+        <div class="icon red">●</div>
+        <h3>GIF Recording</h3>
+        <p>Frame-accurate screen recording exported as a smooth animated GIF, ready to paste into Slack, Notion, or a PR description.</p>
+        <ul>
+          <li>Region, Window, or Full Screen</li>
+          <li>1&ndash;60 FPS, 1&ndash;120 second cap</li>
+          <li>8&ndash;256 color palette + dithering</li>
+          <li>Loop count: 0&ndash;100 or infinite</li>
+          <li>Pre-roll delay timer for clean takes</li>
+        </ul>
+      </div>
+
+      <div class="card cyan">
+        <div class="icon cyan">◧</div>
+        <h3>Screenshot</h3>
+        <p>Pixel-precise stills using the same selection tools as recordings &mdash; plus a few tricks the system tool can't do.</p>
+        <ul>
+          <li>Region, Window, Full Screen</li>
+          <li><strong>Full Page</strong> web capture (long-scroll aware)</li>
+          <li>PNG or JPEG output</li>
+          <li>Optional resize on export</li>
+          <li>One-shot or pre-annotated</li>
+        </ul>
+      </div>
+
+      <div class="card violet">
+        <div class="icon violet">▦</div>
+        <h3>Merger</h3>
+        <p>Capture several regions across the screen, reorder them, and stitch the lot into one composite image.</p>
+        <ul>
+          <li>Vertical or horizontal layout</li>
+          <li>Drag thumbnails to reorder</li>
+          <li>Inline delete &amp; re-shoot</li>
+          <li>Auto-centers mismatched sizes</li>
+          <li>PNG or JPEG output</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURE: ELECTRIC PEN ------------------------------------------- -->
+<section class="section">
+  <div class="container">
+    <div class="feature">
+      <div class="feature-copy">
+        <span class="feature-tag">Signature feature</span>
+        <h2>Electric Pen &mdash; telestrator-style annotation.</h2>
+        <p>
+          Toggle <strong>Annotate</strong> in the popover and the next
+          capture opens a drawing canvas right over the area you've
+          selected. Pick a color, pick a thickness, and circle the
+          interesting bit. Strokes are baked in at capture time &mdash; no
+          second tool, no second file.
+        </p>
+        <p>
+          It works for stills <strong>and</strong> for GIF recordings: in
+          recording mode the canvas stays live the whole take, so you can
+          mark up timing, point at the bug, or score the play in real time.
+          The pen has a soft electric bloom under every stroke so the line
+          reads crisp on any background.
+        </p>
+        <div class="stat-row">
+          <div class="stat"><span class="num">5</span><span class="lbl">Colors</span></div>
+          <div class="stat"><span class="num">3</span><span class="lbl">Thicknesses</span></div>
+          <div class="stat"><span class="num">2</span><span class="lbl">Tools</span></div>
+          <div class="stat"><span class="num">⌘Z</span><span class="lbl">Undo</span></div>
+        </div>
+      </div>
+
+      <div class="mock">
+        <div class="canvas">
+          <div class="target"></div>
+          <div class="target b"></div>
+          <svg class="stroke" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <!-- Yellow circle annotation around target A -->
+            <ellipse cx="26" cy="46" rx="18" ry="12"
+              fill="none" stroke="rgba(255,217,51,0.35)" stroke-width="5"
+              stroke-linecap="round" />
+            <ellipse cx="26" cy="46" rx="18" ry="12"
+              fill="none" stroke="#ffd933" stroke-width="2.2"
+              stroke-linecap="round" />
+            <!-- Red arrow stroke from upper right -->
+            <path d="M 86 18 Q 78 35 70 50"
+              fill="none" stroke="rgba(255,77,77,0.35)" stroke-width="5.5"
+              stroke-linecap="round" />
+            <path d="M 86 18 Q 78 35 70 50"
+              fill="none" stroke="#ff4d4d" stroke-width="2.2"
+              stroke-linecap="round" />
+            <!-- Red arrowhead -->
+            <path d="M 70 50 L 74 44 M 70 50 L 76 50"
+              fill="none" stroke="#ff4d4d" stroke-width="2.2"
+              stroke-linecap="round" />
+            <!-- Cyan underline at target B -->
+            <path d="M 56 80 Q 65 84 76 80"
+              fill="none" stroke="rgba(77,217,255,0.35)" stroke-width="5.5"
+              stroke-linecap="round" />
+            <path d="M 56 80 Q 65 84 76 80"
+              fill="none" stroke="#4dd9ff" stroke-width="2.2"
+              stroke-linecap="round" />
+            <!-- Green tick -->
+            <path d="M 84 70 L 88 76 L 96 64"
+              fill="none" stroke="rgba(77,242,115,0.35)" stroke-width="5"
+              stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M 84 70 L 88 76 L 96 64"
+              fill="none" stroke="#4df273" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="palette">
+          <div class="tool active" title="Pen">✎</div>
+          <div class="tool" title="Eraser">⌫</div>
+          <div class="divider"></div>
+          <div class="thickness">
+            <span class="thick-dot s"></span>
+            <span class="thick-dot m"></span>
+            <span class="thick-dot l"></span>
+          </div>
+          <div class="divider"></div>
+          <div class="swatch" style="background:#ffffff"></div>
+          <div class="swatch active" style="background:#ffd933"></div>
+          <div class="swatch" style="background:#ff4d4d"></div>
+          <div class="swatch" style="background:#4df273"></div>
+          <div class="swatch" style="background:#4dd9ff"></div>
+          <div class="divider"></div>
+          <div class="done">✓ Capture</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURE: FULL PAGE + MERGER ------------------------------------ -->
+<section class="section">
+  <div class="container">
+
+    <!-- Full Page -->
+    <div class="feature flip">
+      <div class="mock">
+        <div class="mock-bar">
+          <span class="dot r"></span>
+          <span class="dot y"></span>
+          <span class="dot g"></span>
+          <span class="url">https://example.com</span>
+        </div>
+        <div class="mock-content">
+          <div class="stack">
+            <div></div><div></div><div></div>
+            <div></div><div></div><div></div><div></div><div></div>
+          </div>
+        </div>
+        <span class="scroll-tag">↓ 6,840 px tall</span>
+      </div>
+
+      <div class="feature-copy">
+        <span class="feature-tag cyan">Full Page</span>
+        <h2>The entire page, including the part below the fold.</h2>
+        <p>
+          Paste a URL into the Screenshot tab. SnapCast loads it in a
+          hidden web view, scrolls through the whole document so lazy-loaded
+          imagery has time to render, then stitches the result into a
+          single tall PNG or JPEG.
+        </p>
+        <p>
+          Configurable viewport width (800&ndash;2560&thinsp;px) and load
+          wait (1&ndash;10&thinsp;seconds) let you tune the render for
+          responsive layouts or slow CMSes.
+        </p>
+      </div>
+    </div>
+
+    <!-- Merger -->
+    <div class="feature">
+      <div class="feature-copy">
+        <span class="feature-tag violet">Composition</span>
+        <h2>Merger &mdash; stitch as you go.</h2>
+        <p>
+          Start a Merger session, grab as many regions as you need, then
+          reorder and combine them into one polished image. Useful for
+          long scrolling captures, before-and-after layouts, or
+          multi-component product shots that don't naturally fit in one
+          screen.
+        </p>
+        <p>
+          Vertical or horizontal stitching, with automatic centering for
+          mismatched dimensions, and the same PNG / JPEG output as the
+          screenshot tool.
+        </p>
+      </div>
+
+      <div class="mock">
+        <div class="mock-bar">
+          <span class="dot r"></span>
+          <span class="dot y"></span>
+          <span class="dot g"></span>
+        </div>
+        <div class="mock-content">
+          <div class="merger">
+            <div class="panel"><span class="num">1</span> Region 1280 × 320 <span class="drag">⋮⋮</span></div>
+            <div class="panel"><span class="num">2</span> Region 1280 × 280 <span class="drag">⋮⋮</span></div>
+            <div class="panel"><span class="num">3</span> Region 1280 × 360 <span class="drag">⋮⋮</span></div>
+            <div class="panel"><span class="num">4</span> Region 1280 × 220 <span class="drag">⋮⋮</span></div>
+          </div>
+          <div class="merger-direction">
+            <div class="opt active">↕ Vertical</div>
+            <div class="opt">↔ Horizontal</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- PHILOSOPHY ------------------------------------------------------ -->
+<section class="philosophy">
+  <div class="container">
+    <p class="pull">
+      Capture so well that <em>editing is optional</em>.
+    </p>
+    <p class="pull-attr">SnapCast design principle</p>
+  </div>
+</section>
+
+<!-- FEATURE: WINDOW PICKER + SETTINGS ------------------------------ -->
+<section class="section">
+  <div class="container">
+
+    <div class="feature">
+      <div class="feature-copy">
+        <span class="feature-tag green">Window picker</span>
+        <h2>Pick the window by seeing it.</h2>
+        <p>
+          Trigger a window capture and a picker opens with live thumbnails
+          of every on-screen window, grouped by application, with a
+          live-filter search field and full arrow-key navigation.
+        </p>
+        <p>
+          System chrome, the Dock, the wallpaper, and SnapCast's own
+          windows are filtered out automatically so the grid only contains
+          things you'd plausibly want to capture.
+        </p>
+      </div>
+
+      <div class="mock">
+        <div class="mock-content" style="padding:14px">
+          <div class="winpicker-search">
+            <span>🔍</span> <span>safari</span>
+          </div>
+          <div class="winpicker-group-header">
+            Safari <span class="count">3</span>
+          </div>
+          <div class="winpicker-grid">
+            <div class="winpicker-tile selected">
+              <div class="preview"></div>
+              <div>example.com</div>
+            </div>
+            <div class="winpicker-tile">
+              <div class="preview"></div>
+              <div>Search results</div>
+            </div>
+          </div>
+          <div class="winpicker-group-header">
+            Xcode <span class="count">2</span>
+          </div>
+          <div class="winpicker-grid">
+            <div class="winpicker-tile">
+              <div class="preview"></div>
+              <div>SnapCast.xcodeproj</div>
+            </div>
+            <div class="winpicker-tile">
+              <div class="preview"></div>
+              <div>PopoverView.swift</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="mock">
+        <div class="settings-mock">
+          <div class="settings-row">
+            <span class="lbl">Frame rate</span>
+            <span class="slider b"></span>
+            <span class="val">30 fps</span>
+          </div>
+          <div class="settings-row">
+            <span class="lbl">Max duration</span>
+            <span class="slider c"></span>
+            <span class="val">90 s</span>
+          </div>
+          <div class="settings-row">
+            <span class="lbl">Capture delay</span>
+            <span class="slider a"></span>
+            <span class="val">3 s</span>
+          </div>
+          <div class="settings-row">
+            <span class="lbl">Show cursor</span>
+            <span class="toggle"></span>
+          </div>
+          <div class="settings-row">
+            <span class="lbl">GIF colors</span>
+            <span class="slider c"></span>
+            <span class="val">256</span>
+          </div>
+          <div class="settings-row">
+            <span class="lbl">Copy to clipboard</span>
+            <span class="toggle off"></span>
+          </div>
+          <div class="settings-row">
+            <span class="lbl">Resize on export</span>
+            <span class="toggle"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-copy">
+        <span class="feature-tag">Tunable</span>
+        <h2>Sliders for everything that should be a slider.</h2>
+        <p>
+          Frame rate (1&ndash;60), duration cap (1&ndash;120&thinsp;s),
+          pre-roll delay (0&ndash;10&thinsp;s), GIF color count
+          (8&ndash;256), dither toggle, loop count, viewport width, page
+          wait time. Every setting is one click away in the popover and
+          persists between launches.
+        </p>
+        <p>
+          Optional resize-on-export with aspect-ratio lock, a custom output
+          folder, and an auto-copy-to-clipboard switch so paste works in
+          Finder, Mail, Slack, <em>and</em> your image editor.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- POLISH GRID ----------------------------------------------------- -->
+<section class="section">
+  <div class="container">
+    <p class="eyebrow">Details</p>
+    <h2 class="section-title">Built for people who ship visuals daily.</h2>
+    <p class="section-sub">
+      Small decisions that add up: no dock clutter, no permission
+      surprises, no clipboard dance, no waiting around to confirm a
+      capture worked.
+    </p>
+
+    <div class="polish-grid">
+      <div class="polish-item">
+        <div class="glyph">▤</div>
+        <div>
+          <h4>Menu-bar only</h4>
+          <p>LSUIElement app &mdash; no dock icon, no app switcher entry. Click the bar icon, do the thing, get back to work.</p>
+        </div>
+      </div>
+
+      <div class="polish-item">
+        <div class="glyph" style="color:var(--accent)">⌘</div>
+        <div>
+          <h4>11 remappable hotkeys</h4>
+          <p>Every capture, the merger session, stop, and the annotation paint toggle can be bound to any chord. Reset to defaults in one click.</p>
+        </div>
+      </div>
+
+      <div class="polish-item">
+        <div class="glyph" style="color:var(--green)">✓</div>
+        <div>
+          <h4>Smart permission UI</h4>
+          <p>Permission state is surfaced in the popover with explicit Grant buttons &mdash; and a Relaunch button for the moments macOS needs a process restart after granting Accessibility.</p>
+        </div>
+      </div>
+
+      <div class="polish-item">
+        <div class="glyph" style="color:var(--cyan)">⬗</div>
+        <div>
+          <h4>Live window thumbnails</h4>
+          <p>Pick the window you want by seeing it, grouped by app, with search and arrow-key navigation &mdash; not by reading a list of titles.</p>
+        </div>
+      </div>
+
+      <div class="polish-item">
+        <div class="glyph" style="color:var(--magenta)">⤴</div>
+        <div>
+          <h4>iOS-style preview toast</h4>
+          <p>After every capture, a thumbnail slides into the bottom-right corner. Click to open the file; ignore it and it fades on its own in five seconds.</p>
+        </div>
+      </div>
+
+      <div class="polish-item">
+        <div class="glyph">⎘</div>
+        <div>
+          <h4>Clipboard-ready output</h4>
+          <p>Optional auto-copy writes both the file URL and the bitmap, so paste works in Finder, Mail, Slack, <em>and</em> in image editors.</p>
+        </div>
+      </div>
+
+      <div class="polish-item">
+        <div class="glyph" style="color:var(--orange)">⏱</div>
+        <div>
+          <h4>Pre-roll delay</h4>
+          <p>0&ndash;10 second countdown before recording starts so you can dismiss the popover, surface your demo, and only catch the part you actually want on tape.</p>
+        </div>
+      </div>
+
+      <div class="polish-item">
+        <div class="glyph" style="color:var(--green)">↘</div>
+        <div>
+          <h4>Custom output folder</h4>
+          <p>Captures land on the Desktop by default, but a folder picker in Settings sends them anywhere &mdash; iCloud Drive, a project directory, a watched dropbox.</p>
+        </div>
+      </div>
+
+      <div class="polish-item">
+        <div class="glyph" style="color:var(--red)">⎋</div>
+        <div>
+          <h4>Esc always works</h4>
+          <p>Mid-selection, mid-annotation, mid-window-picker &mdash; Escape backs out cleanly to where you were before, no orphaned overlays.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOTKEYS --------------------------------------------------------- -->
+<section class="section">
+  <div class="container-narrow">
+    <p class="eyebrow">Default keys</p>
+    <h2 class="section-title">Memorable, mnemonic, remappable.</h2>
+    <p class="section-sub">
+      Defaults are clustered on <kbd>⌘⇧6</kbd>&ndash;<kbd>⌘⇧0</kbd> so you
+      can sweep across the number row. Anything without a default is one
+      click away in Settings.
+    </p>
+
+    <div class="hotkey-grid">
+      <div class="hotkey-row">
+        <span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>6</kbd></span>
+        <div class="label">GIF &mdash; Region <span class="sub">drag to record any rectangle</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>7</kbd></span>
+        <div class="label">GIF &mdash; Full Screen <span class="sub">records the display the cursor is on</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>8</kbd></span>
+        <div class="label">GIF &mdash; Window <span class="sub">opens the live-thumbnail picker</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>9</kbd></span>
+        <div class="label">Screenshot &mdash; Region <span class="sub">same selection tool, single frame</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>0</kbd></span>
+        <div class="label">Screenshot &mdash; Full Screen <span class="sub">quick whole-display PNG/JPEG</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>P</kbd></span>
+        <div class="label">Annotate paint toggle <span class="sub">flip pen between paint and pass-through</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>.</kbd></span>
+        <div class="label">Stop Recording <span class="sub">finalises the GIF</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd>esc</kbd></span>
+        <div class="label">Cancel <span class="sub">selection, annotation, or picker</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd class="empty">unbound</kbd></span>
+        <div class="label">Screenshot &mdash; Window <span class="sub">bind in Settings</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd class="empty">unbound</kbd></span>
+        <div class="label">Screenshot &mdash; Full Page <span class="sub">bind in Settings</span></div>
+      </div>
+      <div class="hotkey-row">
+        <span class="keys"><kbd class="empty">unbound</kbd></span>
+        <div class="label">Merger session <span class="sub">bind in Settings</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER ---------------------------------------------------------- -->
+<footer>
+  <div class="container">
+    <div class="footer-mark">
+      <img src="logo.png" alt="" />
+      <span>SnapCast</span>
+    </div>
+    <div>macOS menu-bar capture utility &middot; built with native Swift, SwiftUI and AppKit</div>
+    <div class="links">
+      <span>com.nxcapture.snapcast</span>
+      <span>·</span>
+      <span>macOS 13+</span>
+      <span>·</span>
+      <span>Zero dependencies</span>
+      <span>·</span>
+      <span>ScreenCaptureKit · WKWebView · CGImageDestination</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

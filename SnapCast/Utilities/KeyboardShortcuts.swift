@@ -51,6 +51,10 @@ enum ShortcutAction: String, CaseIterable, Codable {
     case mergerSession
     case stopRecording
     case cancelCurrent
+    case toggleAnnotation
+    case openEditor
+    case recordingRegionAnnotate
+    case screenshotRegionAnnotate
 
     var displayName: String {
         switch self {
@@ -64,6 +68,10 @@ enum ShortcutAction: String, CaseIterable, Codable {
         case .mergerSession:        return "Merger Session"
         case .stopRecording:        return "Stop Recording"
         case .cancelCurrent:        return "Cancel"
+        case .toggleAnnotation:     return "Annotation — Paint / Passthrough"
+        case .openEditor:           return "Open Editor (last capture)"
+        case .recordingRegionAnnotate:  return "GIF — Region + Annotate"
+        case .screenshotRegionAnnotate: return "Screenshot — Region + Annotate"
         }
     }
 
@@ -79,6 +87,10 @@ enum ShortcutAction: String, CaseIterable, Codable {
         case .mergerSession:        return nil
         case .stopRecording:        return ShortcutBinding(keyCode: 47, modifiers: [.command, .shift]) // ⌘⇧.
         case .cancelCurrent:        return ShortcutBinding(keyCode: 53, modifiers: [])                  // Esc
+        case .toggleAnnotation:     return ShortcutBinding(keyCode: 35, modifiers: [.command, .shift]) // ⌘⇧P
+        case .openEditor:           return ShortcutBinding(keyCode: 14, modifiers: [.command, .shift]) // ⌘⇧E
+        case .recordingRegionAnnotate:  return ShortcutBinding(keyCode: 22, modifiers: [.control, .shift]) // ⌃⇧6
+        case .screenshotRegionAnnotate: return ShortcutBinding(keyCode: 25, modifiers: [.control, .shift]) // ⌃⇧9
         }
     }
 }
@@ -194,6 +206,16 @@ class KeyboardShortcuts {
                 if captureManager.isRecording { captureManager.stopCapture() }
             case .cancelCurrent:
                 if captureManager.isRecording { captureManager.cancelCapture() }
+            case .toggleAnnotation:
+                AnnotationSession.current?.toggleCanvasActive()
+            case .openEditor:
+                if let url = captureManager.lastExportedURL {
+                    PostProcessController.shared.open(url: url)
+                }
+            case .recordingRegionAnnotate:
+                if !busy { captureManager.startCapture(mode: .region, forceAnnotate: true) }
+            case .screenshotRegionAnnotate:
+                if !busy { captureManager.takeScreenshot(mode: .region, forceAnnotate: true) }
             }
         }
     }
