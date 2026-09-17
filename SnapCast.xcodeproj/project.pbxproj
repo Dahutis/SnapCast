@@ -43,6 +43,7 @@
 		A100000030 /* EditorDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030 /* EditorDocument.swift */; };
 		A100000031 /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031 /* EditorCanvasView.swift */; };
 		A100000032 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000032 /* EditorView.swift */; };
+		A100000040 /* VideoTrimViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000040 /* VideoTrimViewController.swift */; };
 		A100000033 /* PostProcessController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000033 /* PostProcessController.swift */; };
 /* End PBXBuildFile section */
 
@@ -85,6 +86,7 @@
 		B100000030 /* EditorDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorDocument.swift; sourceTree = "<group>"; };
 		B100000031 /* EditorCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCanvasView.swift; sourceTree = "<group>"; };
 		B100000032 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		B100000040 /* VideoTrimViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoTrimViewController.swift; sourceTree = "<group>"; };
 		B100000033 /* PostProcessController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostProcessController.swift; sourceTree = "<group>"; };
 		C100000001 /* SnapCast.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SnapCast.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -237,6 +239,7 @@
 				B100000030 /* EditorDocument.swift */,
 				B100000031 /* EditorCanvasView.swift */,
 				B100000032 /* EditorView.swift */,
+				B100000040 /* VideoTrimViewController.swift */,
 				B100000033 /* PostProcessController.swift */,
 			);
 			path = PostProcess;
@@ -346,6 +349,7 @@
 				A100000030 /* EditorDocument.swift in Sources */,
 				A100000031 /* EditorCanvasView.swift in Sources */,
 				A100000032 /* EditorView.swift in Sources */,
+				A100000040 /* VideoTrimViewController.swift in Sources */,
 				A100000033 /* PostProcessController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -17,15 +17,18 @@ final class PostProcessController: NSObject, NSWindowDelegate {
 
     private override init() { super.init() }
 
-    /// Open the editor on a saved capture file (PNG / JPEG / GIF). Videos
-    /// aren't editable here yet — they open in the default player instead.
+    /// Open the editor on a saved capture file (PNG / JPEG / GIF), or the
+    /// trimmer for MP4 recordings.
     func open(url: URL) {
-        if url.pathExtension.lowercased() == OutputFormat.mp4.fileExtension {
-            NSWorkspace.shared.open(url)
-            return
-        }
         guard let settings else {
             NSSound.beep()
+            return
+        }
+        if url.pathExtension.lowercased() == OutputFormat.mp4.fileExtension {
+            let trimmer = VideoTrimViewController(url: url, settings: settings) { [weak self] in
+                self?.closeWindow()
+            }
+            present(contentViewController: trimmer, title: "NxCapture — Trim")
             return
         }
         guard let document = EditorDocument.load(url: url, settings: settings) else {
@@ -39,10 +42,16 @@ final class PostProcessController: NSObject, NSWindowDelegate {
         let editor = EditorView(document: document) { [weak self] in
             self?.closeWindow()
         }
-        let hosting = NSHostingController(rootView: editor)
+        present(contentViewController: NSHostingController(rootView: editor), title: "NxCapture — Edit")
+    }
+
+    private func present(contentViewController: NSViewController, title: String) {
+        // Stop a trimmer that's being replaced so its audio doesn't keep playing.
+        (window?.contentViewController as? VideoTrimViewController)?.stopPlayback()
 
         if let window {
-            window.contentViewController = hosting
+            window.contentViewController = contentViewController
+            window.title = title
         } else {
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 900, height: 640),
@@ -50,11 +59,11 @@ final class PostProcessController: NSObject, NSWindowDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "NxCapture — Edit"
+            window.title = title
             window.titlebarAppearsTransparent = false
             window.isReleasedWhenClosed = false
             window.delegate = self
-            window.contentViewController = hosting
+            window.contentViewController = contentViewController
             window.center()
             self.window = window
         }
@@ -69,6 +78,7 @@ final class PostProcessController: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        (window?.contentViewController as? VideoTrimViewController)?.stopPlayback()
         // Back to menu-bar-only once the editor is gone.
         NSApp.setActivationPolicy(.accessory)
     }

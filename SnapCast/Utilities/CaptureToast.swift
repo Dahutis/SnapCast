@@ -243,7 +243,7 @@ private final class ToastContentView: NSView {
         imageView.addGestureRecognizer(click)
 
         if isVideo {
-            // Videos aren't editable yet — show a play badge instead of Edit.
+            // Play badge so a video thumbnail doesn't read as a still.
             let play = NSImageView()
             play.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "Play")
             play.symbolConfiguration = .init(pointSize: 36, weight: .regular)
@@ -254,15 +254,17 @@ private final class ToastContentView: NSView {
                 play.centerXAnchor.constraint(equalTo: centerXAnchor),
                 play.centerYAnchor.constraint(equalTo: centerYAnchor),
             ])
-            return
         }
 
         // Edit button (bottom-left) — opens the capture in the post-process
         // editor. Tinted background so it stays legible over bright captures.
         let edit = NSButton()
-        edit.image = NSImage(systemSymbolName: "slider.horizontal.below.rectangle", accessibilityDescription: "Edit")
+        edit.image = NSImage(
+            systemSymbolName: isVideo ? "timeline.selection" : "slider.horizontal.below.rectangle",
+            accessibilityDescription: isVideo ? "Trim" : "Edit"
+        )
         edit.imagePosition = .imageLeading
-        edit.title = " Edit"
+        edit.title = isVideo ? " Trim" : " Edit"
         edit.font = .systemFont(ofSize: 11, weight: .semibold)
         edit.isBordered = false
         edit.contentTintColor = .white

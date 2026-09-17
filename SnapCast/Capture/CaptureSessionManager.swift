@@ -75,7 +75,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
         if settings.showCaptureToast {
             CaptureToast.shared.show(imageURL: url)
         }
-        if settings.openEditorAfterCapture, url.pathExtension != OutputFormat.mp4.fileExtension {
+        if settings.openEditorAfterCapture {
             PostProcessController.shared.open(url: url)
         }
     }
