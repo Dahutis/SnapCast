@@ -567,14 +567,9 @@ class CaptureSessionManager: NSObject, ObservableObject {
     }
 
     /// Starts listening for keys if "Show Keystrokes" is on. Returns nil (and
-    /// records without captions) when Accessibility isn't granted, since the
-    /// global monitor would silently receive nothing.
+    /// records without captions) when Input Monitoring isn't granted.
     private func startKeystrokeCapture() -> KeystrokeOverlay? {
         guard settings.showKeystrokes else { return nil }
-        guard AXIsProcessTrusted() else {
-            exportError = "Show Keystrokes needs Accessibility permission — recording without key overlay."
-            return nil
-        }
 
         let timeline = KeystrokeTimeline()
         let monitor = KeystrokeMonitor(
@@ -582,7 +577,10 @@ class CaptureSessionManager: NSObject, ObservableObject {
             mode: settings.keystrokeMode,
             ignoredShortcuts: Array(settings.shortcuts.values)
         )
-        monitor.start()
+        guard monitor.start() else {
+            exportError = "Show Keystrokes needs Input Monitoring permission (Settings → Permissions) — recorded without key overlay."
+            return nil
+        }
         keystrokeMonitor = monitor
         return KeystrokeOverlay(
             timeline: timeline,

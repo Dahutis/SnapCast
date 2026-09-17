@@ -1,16 +1,20 @@
 import AppKit
 
 /// Listens to keyboard events during a recording and feeds KeystrokeTimeline.
-/// Needs Accessibility trust (same as global shortcuts). Password fields use
-/// Secure Input, so macOS never delivers those keystrokes here.
+/// Uses a listen-only CGEventTap, which needs Input Monitoring permission —
+/// an NSEvent global monitor with only Accessibility receives modifier
+/// changes but no key presses on current macOS. Password fields use Secure
+/// Input, so macOS never delivers those keystrokes here.
 ///
-/// NSEvent monitors call back on the main thread.
+/// The tap's run loop source is on the main run loop, so callbacks arrive on
+/// the main thread.
 final class KeystrokeMonitor {
     private let timeline: KeystrokeTimeline
     private let mode: KeystrokeMode
     /// SnapCast's own bindings (Stop, Cancel, …) — kept out of the video.
     private let ignoredShortcuts: [ShortcutBinding]
-    private var monitors: [Any] = []
+    private var tap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
 
     private static let functionKeyCodes: Set<UInt16> = [
         122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111, 105, 107, 113,
@@ -23,29 +27,63 @@ final class KeystrokeMonitor {
         self.ignoredShortcuts = ignoredShortcuts
     }
 
-    func start() {
-        guard monitors.isEmpty else { return }
-        let mask: NSEvent.EventTypeMask = [.keyDown, .flagsChanged]
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] event in
-            self?.handle(event)
-        }) {
-            monitors.append(global)
-        }
-        // Local too, for keys pressed while a SnapCast panel is key.
-        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
-            self?.handle(event)
-            return event
-        }) {
-            monitors.append(local)
-        }
+    /// Returns false when the tap can't be created (Input Monitoring not granted).
+    @discardableResult
+    func start() -> Bool {
+        guard tap == nil else { return true }
+
+        let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .listenOnly,
+            eventsOfInterest: CGEventMask(mask),
+            callback: { _, type, event, userInfo in
+                if let userInfo {
+                    Unmanaged<KeystrokeMonitor>.fromOpaque(userInfo).takeUnretainedValue().handle(type: type, event: event)
+                }
+                return Unmanaged.passUnretained(event)
+            },
+            // Unretained: stop() (also run from deinit) tears the tap down
+            // before self goes away.
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ) else { return false }
+
+        let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        self.tap = tap
+        runLoopSource = source
+        return true
     }
 
     func stop() {
-        monitors.forEach(NSEvent.removeMonitor)
-        monitors.removeAll()
+        if let tap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+        if let runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        }
+        tap = nil
+        runLoopSource = nil
     }
 
     deinit { stop() }
+
+    private func handle(type: CGEventType, event: CGEvent) {
+        switch type {
+        case .tapDisabledByTimeout, .tapDisabledByUserInput:
+            // macOS disables taps whose callbacks stall; switch it back on.
+            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+        case .keyDown, .flagsChanged:
+            if let nsEvent = NSEvent(cgEvent: event) {
+                handle(nsEvent)
+            }
+        default:
+            break
+        }
+    }
 
     private func handle(_ event: NSEvent) {
         let now = KeystrokeTimeline.now

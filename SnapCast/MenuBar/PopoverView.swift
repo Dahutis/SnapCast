@@ -5,6 +5,7 @@ struct PopoverView: View {
     @ObservedObject var captureManager: CaptureSessionManager
     @ObservedObject private var screenPermissions = ScreenPermissions.shared
     @ObservedObject private var accessibilityPermissions = AccessibilityPermissions.shared
+    @ObservedObject private var inputMonitoringPermissions = InputMonitoringPermissions.shared
     @State private var showingSettings = false
     @State private var pulseOpacity: Double = 1.0
 
@@ -64,6 +65,7 @@ struct PopoverView: View {
             // reflects grants the user made in System Settings while away.
             screenPermissions.checkPermission()
             accessibilityPermissions.refresh()
+            inputMonitoringPermissions.refresh()
         }
     }
 
@@ -625,11 +627,23 @@ struct PopoverView: View {
                         title: "Accessibility",
                         subtitle: accessibilityPermissions.needsRelaunch
                             ? "Granted — relaunch to apply"
-                            : "Required for global shortcuts and Show Keystrokes",
+                            : "Required for global keyboard shortcuts",
                         isGranted: accessibilityPermissions.isAuthorized,
                         needsRelaunch: accessibilityPermissions.needsRelaunch,
                         grantAction: { accessibilityPermissions.requestAccess() },
                         openAction: { accessibilityPermissions.openSettings() },
+                        relaunchAction: { accessibilityPermissions.relaunch() }
+                    )
+                    permissionRow(
+                        icon: "eye",
+                        title: "Input Monitoring",
+                        subtitle: inputMonitoringPermissions.needsRelaunch
+                            ? "Granted — relaunch to apply"
+                            : "Required for Show Keystrokes",
+                        isGranted: inputMonitoringPermissions.isAuthorized,
+                        needsRelaunch: inputMonitoringPermissions.needsRelaunch,
+                        grantAction: { inputMonitoringPermissions.requestAccess() },
+                        openAction: { inputMonitoringPermissions.openSettings() },
                         relaunchAction: { accessibilityPermissions.relaunch() }
                     )
                 }
@@ -923,14 +937,14 @@ struct PopoverView: View {
     }
 
     /// Header chip for burning pressed keys into GIF/MP4 recordings. Turns
-    /// orange when on but Accessibility isn't granted (no keys would arrive).
+    /// orange when on but Input Monitoring isn't granted (no keys would arrive).
     private var keystrokesChip: some View {
         let isOn = settings.showKeystrokes
-        let blocked = isOn && !accessibilityPermissions.isAuthorized
+        let blocked = isOn && !inputMonitoringPermissions.isAuthorized
         return Button(action: {
             settings.showKeystrokes.toggle()
-            if settings.showKeystrokes && !accessibilityPermissions.isAuthorized {
-                accessibilityPermissions.requestAccess()
+            if settings.showKeystrokes && !inputMonitoringPermissions.isAuthorized {
+                inputMonitoringPermissions.requestAccess()
             }
         }) {
             HStack(spacing: 4) {
@@ -952,7 +966,7 @@ struct PopoverView: View {
         }
         .buttonStyle(.plain)
         .help(blocked
-              ? "Show Keystrokes needs Accessibility permission (Settings → Permissions)"
+              ? "Show Keystrokes needs Input Monitoring permission (Settings → Permissions)"
               : isOn ? "Pressed keys will be drawn into recordings"
               : "Enable to show pressed keys in GIF/MP4 recordings")
     }
