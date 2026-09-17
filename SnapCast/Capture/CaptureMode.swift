@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 enum CaptureType: String, CaseIterable, Codable {
     case recording = "Recording"
@@ -108,6 +109,35 @@ enum VideoQuality: String, CaseIterable, Codable {
         case .low: return 0.04
         case .medium: return 0.08
         case .high: return 0.16
+        }
+    }
+}
+
+enum KeystrokeMode: String, CaseIterable, Codable {
+    /// Chords with ⌘ / ⌃ / ⌥ and function keys.
+    case shortcuts = "Shortcuts"
+    /// Also plain typing, Return/Tab/arrows and held modifiers.
+    case allKeys = "All Keys"
+}
+
+enum KeystrokePosition: String, CaseIterable, Codable {
+    case bottomLeft = "Bottom Left"
+    case bottomCenter = "Bottom Center"
+    case bottomRight = "Bottom Right"
+    case topCenter = "Top Center"
+}
+
+enum KeystrokeSize: String, CaseIterable, Codable {
+    case small = "S"
+    case medium = "M"
+    case large = "L"
+
+    /// Font size as a fraction of the frame height.
+    var heightFraction: CGFloat {
+        switch self {
+        case .small: return 0.028
+        case .medium: return 0.04
+        case .large: return 0.056
         }
     }
 }

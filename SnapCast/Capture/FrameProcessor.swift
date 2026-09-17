@@ -23,11 +23,39 @@ class FrameProcessor: NSObject, SCStreamOutput {
 
     private var firstTimestamp: TimeInterval?
 
-    init(cropRect: CGRect?, targetSize: CGSize?) {
+    private let keystrokes: KeystrokeOverlay?
+    private let frameInterval: TimeInterval
+    // Clean (caption-free) copy of the newest frame + its host time, guarded by `lock`.
+    private var lastRawImage: CGImage?
+    private var lastTimestamp: TimeInterval?
+    /// Re-emits the last frame while key captions animate over a static
+    /// screen, since SCKit sends no frames when nothing changes.
+    private var keystrokeTicker: DispatchSourceTimer?
+
+    init(cropRect: CGRect?, targetSize: CGSize?, keystrokes: KeystrokeOverlay? = nil, fps: Int = 15) {
         self.cropRect = cropRect
         self.targetSize = targetSize
+        self.keystrokes = keystrokes
+        self.frameInterval = 1 / Double(max(fps, 1))
         super.init()
+
+        if keystrokes != nil {
+            let ticker = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
+            ticker.schedule(deadline: .now(), repeating: frameInterval)
+            ticker.setEventHandler { [weak self] in self?.tickKeystrokes() }
+            ticker.resume()
+            keystrokeTicker = ticker
+        }
     }
+
+    /// Stops the keystroke ticker. Call once the stream has stopped, before
+    /// reading `frames`.
+    func stop() {
+        keystrokeTicker?.cancel()
+        keystrokeTicker = nil
+    }
+
+    deinit { keystrokeTicker?.cancel() }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .screen else { return }
@@ -72,15 +100,43 @@ class FrameProcessor: NSObject, SCStreamOutput {
         }
 
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        let timestamp = CMTimeGetSeconds(pts)
+        store(cgImage, at: CMTimeGetSeconds(pts))
+    }
+
+    /// Burns in any visible key captions and appends the frame.
+    private func store(_ raw: CGImage, at timestamp: TimeInterval) {
+        var image = raw
+        if let keystrokes {
+            let captions = keystrokes.timeline.visibleCaptions(at: timestamp)
+            if !captions.isEmpty, let composited = keystrokes.renderer.composite(captions, onto: raw) {
+                image = composited
+            }
+        }
 
         lock.lock()
+        defer { lock.unlock() }
+        if let last = lastTimestamp, timestamp <= last { return }
         if firstTimestamp == nil {
             firstTimestamp = timestamp
         }
         let relativeTime = timestamp - (firstTimestamp ?? timestamp)
-        _frames.append((cgImage, relativeTime))
+        _frames.append((image, relativeTime))
+        lastRawImage = raw
+        lastTimestamp = timestamp
+    }
+
+    private func tickKeystrokes() {
+        guard let keystrokes else { return }
+        lock.lock()
+        let raw = lastRawImage
+        let last = lastTimestamp
         lock.unlock()
+
+        let now = KeystrokeTimeline.now
+        guard let raw, let last,
+              now - last >= frameInterval * 1.5,
+              keystrokes.timeline.needsFrame(at: now) else { return }
+        store(raw, at: now)
     }
 
     private func resizeImage(_ image: CGImage, to size: CGSize) -> CGImage? {

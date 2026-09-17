@@ -22,6 +22,7 @@ struct PopoverView: View {
                     .font(.headline)
                 Spacer()
                 if !showingSettings {
+                    keystrokesChip
                     annotateChip
                     Button(action: { showingSettings = true }) {
                         Image(systemName: "gear")
@@ -624,7 +625,7 @@ struct PopoverView: View {
                         title: "Accessibility",
                         subtitle: accessibilityPermissions.needsRelaunch
                             ? "Granted — relaunch to apply"
-                            : "Required for global keyboard shortcuts",
+                            : "Required for global shortcuts and Show Keystrokes",
                         isGranted: accessibilityPermissions.isAuthorized,
                         needsRelaunch: accessibilityPermissions.needsRelaunch,
                         grantAction: { accessibilityPermissions.requestAccess() },
@@ -698,6 +699,35 @@ struct PopoverView: View {
                         }
                     }
                     Text("Recorded at native Retina resolution unless Resize is on. H.264 plays everywhere; HEVC is smaller and allows up to 8K.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                // Keystrokes
+                settingsSection("Keystrokes") {
+                    Toggle("Show Keystrokes in Recordings", isOn: $settings.showKeystrokes)
+                        .font(.caption)
+                    settingsRow("Show") {
+                        Picker("", selection: $settings.keystrokeMode) {
+                            ForEach(KeystrokeMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+                    settingsRow("Position") {
+                        Picker("", selection: $settings.keystrokePosition) {
+                            ForEach(KeystrokePosition.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .labelsHidden()
+                    }
+                    settingsRow("Size") {
+                        Picker("", selection: $settings.keystrokeSize) {
+                            ForEach(KeystrokeSize.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+                    Text("Keys are drawn into the GIF/MP4, not on screen. SnapCast's own shortcuts and password fields are never shown.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -890,6 +920,41 @@ struct PopoverView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// Header chip for burning pressed keys into GIF/MP4 recordings. Turns
+    /// orange when on but Accessibility isn't granted (no keys would arrive).
+    private var keystrokesChip: some View {
+        let isOn = settings.showKeystrokes
+        let blocked = isOn && !accessibilityPermissions.isAuthorized
+        return Button(action: {
+            settings.showKeystrokes.toggle()
+            if settings.showKeystrokes && !accessibilityPermissions.isAuthorized {
+                accessibilityPermissions.requestAccess()
+            }
+        }) {
+            HStack(spacing: 4) {
+                Image(systemName: blocked ? "exclamationmark.triangle.fill" : "keyboard")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("Keys")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule().fill(
+                    blocked ? Color.orange.opacity(0.85)
+                        : isOn ? Color.accentColor.opacity(0.85)
+                        : Color.primary.opacity(0.08)
+                )
+            )
+            .foregroundColor(isOn ? .white : .secondary)
+        }
+        .buttonStyle(.plain)
+        .help(blocked
+              ? "Show Keystrokes needs Accessibility permission (Settings → Permissions)"
+              : isOn ? "Pressed keys will be drawn into recordings"
+              : "Enable to show pressed keys in GIF/MP4 recordings")
     }
 
     /// Compact toggle chip in the popover header. Tapping flips

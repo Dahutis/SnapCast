@@ -40,6 +40,12 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     /// Where the writer records; differs from `outputURL` when a mixdown is needed.
     private let recordingURL: URL
 
+    private let keystrokes: KeystrokeOverlay?
+    private let frameInterval: Double
+    /// Re-emits the last frame while key captions are animating over a
+    /// static screen (SCKit sends no frames when nothing changes).
+    private var keystrokeTicker: DispatchSourceTimer?
+
     // Touched only on `queue`.
     private var sessionStarted = false
     private var sessionStart: CMTime = .invalid
@@ -88,9 +94,12 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     init(
         outputURL: URL, width: Int, height: Int, fps: Int,
         codec: VideoCodec, quality: VideoQuality,
-        recordSystemAudio: Bool, recordMicrophone: Bool
+        recordSystemAudio: Bool, recordMicrophone: Bool,
+        keystrokes: KeystrokeOverlay? = nil
     ) throws {
         self.outputURL = outputURL
+        self.keystrokes = keystrokes
+        frameInterval = 1 / Double(fps)
         recordingURL = (recordSystemAudio && recordMicrophone)
             ? outputURL.deletingLastPathComponent()
                 .appendingPathComponent(".\(outputURL.deletingPathExtension().lastPathComponent).tracks.mp4")
@@ -153,6 +162,14 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
         guard writer.startWriting() else { throw VideoRecorderError.writerFailed(writer.error) }
 
         super.init()
+
+        if keystrokes != nil {
+            let ticker = DispatchSource.makeTimerSource(queue: queue)
+            ticker.schedule(deadline: .now(), repeating: frameInterval)
+            ticker.setEventHandler { [weak self] in self?.tickKeystrokes() }
+            ticker.resume()
+            keystrokeTicker = ticker
+        }
     }
 
     // MARK: - SCStreamOutput
@@ -190,13 +207,41 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
         guard videoInput.isReadyForMoreMediaData,
               !lastPTS.isValid || CMTimeCompare(pts, lastPTS) > 0 else { return }
 
-        if adaptor.append(pixelBuffer, withPresentationTime: pts) {
+        if write(pixelBuffer, at: pts) {
             lastPixelBuffer = pixelBuffer
             lastPTS = pts
             countLock.lock()
             _frameCount += 1
             countLock.unlock()
         }
+    }
+
+    /// Appends a frame, burning in key captions when any are visible at `pts`.
+    /// `lastPixelBuffer` always keeps the clean frame so re-emitted frames
+    /// don't stack captions.
+    private func write(_ pixelBuffer: CVPixelBuffer, at pts: CMTime) -> Bool {
+        var frame = pixelBuffer
+        if let keystrokes, let pool = adaptor.pixelBufferPool {
+            let captions = keystrokes.timeline.visibleCaptions(at: pts.seconds)
+            var composited: CVPixelBuffer?
+            if !captions.isEmpty,
+               CVPixelBufferPoolCreatePixelBuffer(nil, pool, &composited) == kCVReturnSuccess,
+               let composited,
+               keystrokes.renderer.composite(captions, source: pixelBuffer, destination: composited) {
+                frame = composited
+            }
+        }
+        return adaptor.append(frame, withPresentationTime: pts)
+    }
+
+    private func tickKeystrokes() {
+        guard !isClosed, sessionStarted, let last = lastPixelBuffer, let keystrokes else { return }
+        let now = CMClockGetTime(CMClockGetHostTimeClock())
+        // 1.5× the interval so real SCKit frames (stamped slightly before
+        // delivery) aren't pre-empted by a duplicate.
+        guard now.seconds - lastPTS.seconds >= frameInterval * 1.5,
+              keystrokes.timeline.needsFrame(at: now.seconds) else { return }
+        append(last, at: now)
     }
 
     /// Microphone samples from MicrophoneCapture. Must be called on `queue`.
@@ -260,6 +305,9 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
                     return
                 }
 
+                keystrokeTicker?.cancel()
+                keystrokeTicker = nil
+
                 guard sessionStarted, lastPixelBuffer != nil else {
                     isClosed = true
                     writer.cancelWriting()
@@ -273,7 +321,7 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
                 if let last = lastPixelBuffer, CMTimeCompare(now, lastPTS) > 0 {
                     // Bypass the readiness check: this is the final sample and
                     // dropping it would shorten the video.
-                    _ = adaptor.append(last, withPresentationTime: now)
+                    _ = write(last, at: now)
                 }
                 isClosed = true
                 lastPixelBuffer = nil
@@ -375,6 +423,8 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     /// Abort the recording and delete the partial file.
     func cancel() {
         queue.async { [self] in
+            keystrokeTicker?.cancel()
+            keystrokeTicker = nil
             guard !isClosed else { return }
             isClosed = true
             lastPixelBuffer = nil

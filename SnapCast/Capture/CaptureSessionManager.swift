@@ -45,6 +45,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
     private var frameProcessor: FrameProcessor?
     private var videoRecorder: VideoRecorder?
     private var microphone: MicrophoneCapture?
+    private var keystrokeMonitor: KeystrokeMonitor?
     /// Pushes volume slider changes into the active VideoRecorder.
     private var volumeObservers: Set<AnyCancellable> = []
     private var timer: Timer?
@@ -131,6 +132,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 frameProcessor = nil
                 microphone?.stop()
                 microphone = nil
+                stopKeystrokeCapture()
                 videoRecorder?.cancel()
                 videoRecorder = nil
                 volumeObservers.removeAll()
@@ -363,6 +365,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     self.annotationSession = session
                 }
 
+                let keystrokes = self.startKeystrokeCapture()
+
                 if settings.outputFormat.isVideo {
                     try await self.startVideoStream(
                         filter: filter,
@@ -371,7 +375,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
                             height: videoSourceRect?.height ?? CGFloat(captureHeight)
                         ),
                         sourceRect: videoSourceRect,
-                        pixelScale: pixelScale
+                        pixelScale: pixelScale,
+                        keystrokes: keystrokes
                     )
                     self.cropRect = nil
                     self.didStartStream(isVideo: true)
@@ -409,7 +414,9 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     cropRect: self.cropRect,
                     targetSize: (settings.resizeEnabled || self.cropRect != nil)
                         ? CGSize(width: outputWidth, height: outputHeight)
-                        : nil
+                        : nil,
+                    keystrokes: keystrokes,
+                    fps: settings.fps
                 )
 
                 let stream = SCStream(filter: filter, configuration: config, delegate: nil)
@@ -425,6 +432,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 annotationSession = nil
                 microphone?.stop()
                 microphone = nil
+                stopKeystrokeCapture()
                 videoRecorder?.cancel()
                 videoRecorder = nil
                 volumeObservers.removeAll()
@@ -466,7 +474,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
         filter: SCContentFilter,
         pointSize: CGSize,
         sourceRect: CGRect?,
-        pixelScale: CGFloat
+        pixelScale: CGFloat,
+        keystrokes: KeystrokeOverlay?
     ) async throws {
         let codec = settings.videoCodec
         let fps = settings.videoFps
@@ -526,7 +535,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
             codec: codec,
             quality: settings.videoQuality,
             recordSystemAudio: recordAudio,
-            recordMicrophone: recordMicrophone
+            recordMicrophone: recordMicrophone,
+            keystrokes: keystrokes
         )
         videoRecorder = recorder
 
@@ -554,6 +564,35 @@ class CaptureSessionManager: NSObject, ObservableObject {
         }
         try await stream.startCapture()
         self.stream = stream
+    }
+
+    /// Starts listening for keys if "Show Keystrokes" is on. Returns nil (and
+    /// records without captions) when Accessibility isn't granted, since the
+    /// global monitor would silently receive nothing.
+    private func startKeystrokeCapture() -> KeystrokeOverlay? {
+        guard settings.showKeystrokes else { return nil }
+        guard AXIsProcessTrusted() else {
+            exportError = "Show Keystrokes needs Accessibility permission — recording without key overlay."
+            return nil
+        }
+
+        let timeline = KeystrokeTimeline()
+        let monitor = KeystrokeMonitor(
+            timeline: timeline,
+            mode: settings.keystrokeMode,
+            ignoredShortcuts: Array(settings.shortcuts.values)
+        )
+        monitor.start()
+        keystrokeMonitor = monitor
+        return KeystrokeOverlay(
+            timeline: timeline,
+            renderer: KeystrokeOverlayRenderer(position: settings.keystrokePosition, size: settings.keystrokeSize)
+        )
+    }
+
+    private func stopKeystrokeCapture() {
+        keystrokeMonitor?.stop()
+        keystrokeMonitor = nil
     }
 
     private static func screen(forDisplayID displayID: CGDirectDisplayID) -> NSScreen? {
@@ -592,6 +631,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
         // dismissing now won't drop trailing strokes.
         annotationSession?.dismiss()
         annotationSession = nil
+        stopKeystrokeCapture()
 
         if let recorder = videoRecorder {
             videoRecorder = nil
@@ -609,6 +649,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
             return
         }
 
+        frameProcessor?.stop()
         guard let processor = frameProcessor, !processor.frames.isEmpty else {
             exportError = "No frames captured"
             frameProcessor = nil
