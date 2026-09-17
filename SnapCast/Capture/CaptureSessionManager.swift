@@ -23,6 +23,7 @@ enum ClipboardHelper {
 @MainActor
 class CaptureSessionManager: NSObject, ObservableObject {
     @Published var isRecording = false
+    @Published var isPaused = false
     @Published var elapsedTime: TimeInterval = 0
     @Published var capturedFrameCount = 0
     @Published var lastExportedURL: URL?
@@ -51,6 +52,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
     private var volumeObservers: Set<AnyCancellable> = []
     private var timer: Timer?
     private var startTime: Date?
+    private var pauseStartedAt: Date?
+    private var pausedDuration: TimeInterval = 0
     private var delayTimer: Timer?
     private var cropRect: CGRect?
 
@@ -118,6 +121,33 @@ class CaptureSessionManager: NSObject, ObservableObject {
         }
     }
 
+    func togglePause() {
+        isPaused ? resumeCapture() : pauseCapture()
+    }
+
+    func pauseCapture() {
+        guard isRecording, !isPaused else { return }
+        videoRecorder?.pause()
+        frameProcessor?.pause()
+        pauseStartedAt = Date()
+        isPaused = true
+    }
+
+    func resumeCapture() {
+        guard isRecording, isPaused, let pausedAt = pauseStartedAt else { return }
+        pausedDuration += Date().timeIntervalSince(pausedAt)
+        pauseStartedAt = nil
+        videoRecorder?.resume()
+        frameProcessor?.resume()
+        isPaused = false
+    }
+
+    private func resetPauseState() {
+        isPaused = false
+        pauseStartedAt = nil
+        pausedDuration = 0
+    }
+
     func cancelCapture() {
         delayTimer?.invalidate()
         delayTimer = nil
@@ -128,6 +158,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 try? await stream?.stopCapture()
                 stream = nil
                 isRecording = false
+                resetPauseState()
                 timer?.invalidate()
                 timer = nil
                 frameProcessor = nil
@@ -452,6 +483,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
         capturedFrameCount = 0
         elapsedTime = 0
         startTime = Date()
+        resetPauseState()
 
         // Stream is live — flip the annotation palette into its
         // recording layout (Stop button + timer). Canvas keeps
@@ -461,7 +493,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self, let start = self.startTime else { return }
-                self.elapsedTime = Date().timeIntervalSince(start)
+                let currentPause = self.pauseStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+                self.elapsedTime = Date().timeIntervalSince(start) - self.pausedDuration - currentPause
                 self.capturedFrameCount = self.videoRecorder?.frameCount ?? self.frameProcessor?.frameCount ?? 0
                 self.annotationSession?.updateElapsed(self.elapsedTime)
 
@@ -647,6 +680,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
         }
         stream = nil
         isRecording = false
+        resetPauseState()
 
         // Tear down the annotation overlay once the stream has stopped — the
         // last frame's already been pushed to the processor by this point, so

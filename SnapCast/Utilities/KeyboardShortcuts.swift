@@ -50,6 +50,7 @@ enum ShortcutAction: String, CaseIterable, Codable {
     case screenshotFullPage
     case mergerSession
     case stopRecording
+    case pauseRecording
     case cancelCurrent
     case toggleAnnotation
     case openEditor
@@ -58,19 +59,20 @@ enum ShortcutAction: String, CaseIterable, Codable {
 
     var displayName: String {
         switch self {
-        case .recordingRegion:      return "GIF — Region"
-        case .recordingFullScreen:  return "GIF — Full Screen"
-        case .recordingWindow:      return "GIF — Window"
+        case .recordingRegion:      return "Record — Region"
+        case .recordingFullScreen:  return "Record — Full Screen"
+        case .recordingWindow:      return "Record — Window"
         case .screenshotRegion:     return "Screenshot — Region"
         case .screenshotFullScreen: return "Screenshot — Full Screen"
         case .screenshotWindow:     return "Screenshot — Window"
         case .screenshotFullPage:   return "Screenshot — Full Page"
         case .mergerSession:        return "Merger Session"
         case .stopRecording:        return "Stop Recording"
+        case .pauseRecording:       return "Pause / Resume Recording"
         case .cancelCurrent:        return "Cancel"
         case .toggleAnnotation:     return "Annotation — Paint / Passthrough"
         case .openEditor:           return "Open Editor (last capture)"
-        case .recordingRegionAnnotate:  return "GIF — Region + Annotate"
+        case .recordingRegionAnnotate:  return "Record — Region + Annotate"
         case .screenshotRegionAnnotate: return "Screenshot — Region + Annotate"
         }
     }
@@ -86,6 +88,7 @@ enum ShortcutAction: String, CaseIterable, Codable {
         case .screenshotFullPage:   return nil
         case .mergerSession:        return nil
         case .stopRecording:        return ShortcutBinding(keyCode: 47, modifiers: [.command, .shift]) // ⌘⇧.
+        case .pauseRecording:       return ShortcutBinding(keyCode: 43, modifiers: [.command, .shift]) // ⌘⇧,
         case .cancelCurrent:        return ShortcutBinding(keyCode: 53, modifiers: [])                  // Esc
         case .toggleAnnotation:     return ShortcutBinding(keyCode: 35, modifiers: [.command, .shift]) // ⌘⇧P
         case .openEditor:           return ShortcutBinding(keyCode: 14, modifiers: [.command, .shift]) // ⌘⇧E
@@ -204,6 +207,8 @@ class KeyboardShortcuts {
                 if !busy { captureManager.startMerger() }
             case .stopRecording:
                 if captureManager.isRecording { captureManager.stopCapture() }
+            case .pauseRecording:
+                if captureManager.isRecording { captureManager.togglePause() }
             case .cancelCurrent:
                 if captureManager.isRecording { captureManager.cancelCapture() }
             case .toggleAnnotation:

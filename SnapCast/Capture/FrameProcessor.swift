@@ -28,6 +28,11 @@ class FrameProcessor: NSObject, SCStreamOutput {
     // Clean (caption-free) copy of the newest frame + its host time, guarded by `lock`.
     private var lastRawImage: CGImage?
     private var lastTimestamp: TimeInterval?
+    // Pause state, guarded by `lock`.
+    private var isPaused = false
+    private var pausedAt: TimeInterval = 0
+    private var resumedAt: TimeInterval?
+    private var pausedTotal: TimeInterval = 0
     /// Re-emits the last frame while overlay captions/clicks animate over a
     /// static screen, since SCKit sends no frames when nothing changes.
     private var overlayTicker: DispatchSourceTimer?
@@ -46,6 +51,25 @@ class FrameProcessor: NSObject, SCStreamOutput {
             ticker.resume()
             overlayTicker = ticker
         }
+    }
+
+    /// Drops frames until `resume()`; the paused span is cut out.
+    func pause() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !isPaused else { return }
+        isPaused = true
+        pausedAt = KeystrokeTimeline.now
+    }
+
+    func resume() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard isPaused else { return }
+        let now = KeystrokeTimeline.now
+        pausedTotal += now - pausedAt
+        resumedAt = now
+        isPaused = false
     }
 
     /// Stops the overlay ticker. Call once the stream has stopped, before
@@ -105,6 +129,11 @@ class FrameProcessor: NSObject, SCStreamOutput {
 
     /// Burns in any visible overlay (keys, clicks) and appends the frame.
     private func store(_ raw: CGImage, at timestamp: TimeInterval) {
+        lock.lock()
+        let skip = isPaused || (resumedAt.map { timestamp < $0 } ?? false)
+        lock.unlock()
+        if skip { return }
+
         var image = raw
         if let overlay, let composited = overlay.composite(onto: raw, at: timestamp) {
             image = composited
@@ -116,7 +145,7 @@ class FrameProcessor: NSObject, SCStreamOutput {
         if firstTimestamp == nil {
             firstTimestamp = timestamp
         }
-        let relativeTime = timestamp - (firstTimestamp ?? timestamp)
+        let relativeTime = timestamp - (firstTimestamp ?? timestamp) - pausedTotal
         _frames.append((image, relativeTime))
         lastRawImage = raw
         lastTimestamp = timestamp

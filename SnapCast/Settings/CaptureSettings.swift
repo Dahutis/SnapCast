@@ -203,11 +203,20 @@ class CaptureSettings: ObservableObject {
         self.annotateBeforeCapture = defaults.object(forKey: "annotateBeforeCapture") as? Bool ?? false
         self.openEditorAfterCapture = defaults.object(forKey: "openEditorAfterCapture") as? Bool ?? false
         if let data = defaults.data(forKey: "shortcuts"),
-           let saved = try? JSONDecoder().decode([String: ShortcutBinding].self, from: data) {
+           var saved = try? JSONDecoder().decode([String: ShortcutBinding].self, from: data) {
+            // Give actions added in later versions their default binding.
+            // Actions the user already knew about stay as saved, including
+            // ones they cleared on purpose.
+            let known = Set(defaults.stringArray(forKey: "knownShortcutActions")
+                ?? ShortcutAction.allCases.map(\.rawValue).filter { $0 != ShortcutAction.pauseRecording.rawValue })
+            for action in ShortcutAction.allCases where !known.contains(action.rawValue) && saved[action.rawValue] == nil {
+                saved[action.rawValue] = action.defaultBinding
+            }
             self.shortcuts = saved
         } else {
             self.shortcuts = Self.defaultShortcuts
         }
+        defaults.set(ShortcutAction.allCases.map(\.rawValue), forKey: "knownShortcutActions")
     }
 
     func outputFileURL(extension ext: String) -> URL {

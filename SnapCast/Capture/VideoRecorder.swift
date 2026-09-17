@@ -51,7 +51,15 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     private var sessionStart: CMTime = .invalid
     private var isClosed = false
     private var lastPixelBuffer: CVPixelBuffer?
+    /// Writer timeline time (host time minus paused time) of the last frame.
     private var lastPTS: CMTime = .invalid
+
+    // Pausing: host times inside a pause are cut out of the file by shifting
+    // everything after it back by the total paused duration.
+    private var isPaused = false
+    private var pausedAt: CMTime = .invalid
+    private var resumedAt: CMTime = .invalid
+    private var pausedTotal: CMTime = .zero
 
     private let countLock = NSLock()
     private var _frameCount = 0
@@ -193,9 +201,11 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
         append(pixelBuffer, at: sampleBuffer.presentationTimeStamp)
     }
 
-    private func append(_ pixelBuffer: CVPixelBuffer, at pts: CMTime) {
-        guard writer.status == .writing else { return }
+    /// `hostTime` is the capture time on the host clock.
+    private func append(_ pixelBuffer: CVPixelBuffer, at hostTime: CMTime) {
+        guard writer.status == .writing, !isPaused, !capturedDuringPause(hostTime) else { return }
 
+        let pts = CMTimeSubtract(hostTime, pausedTotal)
         if !sessionStarted {
             writer.startSession(atSourceTime: pts)
             sessionStarted = true
@@ -207,7 +217,7 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
         guard videoInput.isReadyForMoreMediaData,
               !lastPTS.isValid || CMTimeCompare(pts, lastPTS) > 0 else { return }
 
-        if write(pixelBuffer, at: pts) {
+        if write(pixelBuffer, overlayTime: hostTime.seconds, at: pts) {
             lastPixelBuffer = pixelBuffer
             lastPTS = pts
             countLock.lock()
@@ -216,16 +226,21 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
         }
     }
 
+    /// Frames/samples stamped inside a pause but delivered after resuming.
+    private func capturedDuringPause(_ hostTime: CMTime) -> Bool {
+        resumedAt.isValid && CMTimeCompare(hostTime, resumedAt) < 0
+    }
+
     /// Appends a frame, burning in the overlay when anything is visible at
-    /// `pts`. `lastPixelBuffer` always keeps the clean frame so re-emitted
-    /// frames don't stack overlays.
-    private func write(_ pixelBuffer: CVPixelBuffer, at pts: CMTime) -> Bool {
+    /// `overlayTime` (host seconds). `lastPixelBuffer` always keeps the clean
+    /// frame so re-emitted frames don't stack overlays.
+    private func write(_ pixelBuffer: CVPixelBuffer, overlayTime: Double, at pts: CMTime) -> Bool {
         var frame = pixelBuffer
-        if let overlay, overlay.needsFrame(at: pts.seconds), let pool = adaptor.pixelBufferPool {
+        if let overlay, overlay.needsFrame(at: overlayTime), let pool = adaptor.pixelBufferPool {
             var composited: CVPixelBuffer?
             if CVPixelBufferPoolCreatePixelBuffer(nil, pool, &composited) == kCVReturnSuccess,
                let composited,
-               overlay.composite(source: pixelBuffer, destination: composited, at: pts.seconds) {
+               overlay.composite(source: pixelBuffer, destination: composited, at: overlayTime) {
                 frame = composited
             }
         }
@@ -233,11 +248,11 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     }
 
     private func tickOverlay() {
-        guard !isClosed, sessionStarted, let last = lastPixelBuffer, let overlay else { return }
+        guard !isClosed, !isPaused, sessionStarted, let last = lastPixelBuffer, let overlay else { return }
         let now = CMClockGetTime(CMClockGetHostTimeClock())
         // 1.5× the interval so real SCKit frames (stamped slightly before
         // delivery) aren't pre-empted by a duplicate.
-        guard now.seconds - lastPTS.seconds >= frameInterval * 1.5,
+        guard CMTimeSubtract(now, pausedTotal).seconds - lastPTS.seconds >= frameInterval * 1.5,
               overlay.needsFrame(at: now.seconds) else { return }
         append(last, at: now)
     }
@@ -251,13 +266,40 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     private func appendAudio(_ sampleBuffer: CMSampleBuffer, to audioInput: AVAssetWriterInput?, gain: Float) {
         // The session starts on the first video frame; audio that arrives
         // earlier would land before the timeline origin, so drop it.
-        guard let audioInput, writer.status == .writing, sessionStarted,
-              CMTimeCompare(sampleBuffer.presentationTimeStamp, sessionStart) >= 0,
+        guard let audioInput, writer.status == .writing, sessionStarted, !isPaused,
+              !capturedDuringPause(sampleBuffer.presentationTimeStamp),
+              let shifted = Self.shift(sampleBuffer, back: pausedTotal),
+              CMTimeCompare(shifted.presentationTimeStamp, sessionStart) >= 0,
               audioInput.isReadyForMoreMediaData else { return }
         if gain != 1 {
-            Self.processSamples(sampleBuffer, gain: gain)
+            Self.processSamples(shifted, gain: gain)
         }
-        audioInput.append(sampleBuffer)
+        audioInput.append(shifted)
+    }
+
+    /// Copy of `sampleBuffer` with all timestamps moved back by `offset`
+    /// (the time spent paused). Shares the original sample data.
+    private static func shift(_ sampleBuffer: CMSampleBuffer, back offset: CMTime) -> CMSampleBuffer? {
+        guard CMTimeCompare(offset, .zero) > 0 else { return sampleBuffer }
+
+        var count: CMItemCount = 0
+        CMSampleBufferGetSampleTimingInfoArray(sampleBuffer, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count)
+        var timing = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(), count: count)
+        CMSampleBufferGetSampleTimingInfoArray(sampleBuffer, entryCount: count, arrayToFill: &timing, entriesNeededOut: &count)
+        for i in timing.indices {
+            timing[i].presentationTimeStamp = CMTimeSubtract(timing[i].presentationTimeStamp, offset)
+            if timing[i].decodeTimeStamp.isValid {
+                timing[i].decodeTimeStamp = CMTimeSubtract(timing[i].decodeTimeStamp, offset)
+            }
+        }
+
+        var shifted: CMSampleBuffer?
+        CMSampleBufferCreateCopyWithNewTiming(
+            allocator: nil, sampleBuffer: sampleBuffer,
+            sampleTimingEntryCount: count, sampleTimingArray: &timing,
+            sampleBufferOut: &shifted
+        )
+        return shifted
     }
 
     /// Applies `gain` to float32 PCM in place, then soft-limits so boosted
@@ -292,6 +334,26 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
 
     // MARK: - Lifecycle
 
+    /// Stops writing frames and audio until `resume()`. The paused span is
+    /// cut out of the file.
+    func pause() {
+        queue.async { [self] in
+            guard !isPaused, !isClosed else { return }
+            isPaused = true
+            pausedAt = CMClockGetTime(CMClockGetHostTimeClock())
+        }
+    }
+
+    func resume() {
+        queue.async { [self] in
+            guard isPaused, !isClosed else { return }
+            let now = CMClockGetTime(CMClockGetHostTimeClock())
+            pausedTotal = CMTimeAdd(pausedTotal, CMTimeSubtract(now, pausedAt))
+            resumedAt = now
+            isPaused = false
+        }
+    }
+
     /// Call after the SCStream has stopped. Holds the last frame until "now"
     /// (SCKit only sends frames when the screen changes, so a static ending
     /// would otherwise be cut off), then finalizes the file.
@@ -315,11 +377,13 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
                 }
 
                 // SCKit timestamps are on the host clock.
-                let now = CMClockGetTime(CMClockGetHostTimeClock())
-                if let last = lastPixelBuffer, CMTimeCompare(now, lastPTS) > 0 {
+                // Stopped while paused: the video ends where the pause began.
+                let end = isPaused ? pausedAt : CMClockGetTime(CMClockGetHostTimeClock())
+                let endPTS = CMTimeSubtract(end, pausedTotal)
+                if let last = lastPixelBuffer, CMTimeCompare(endPTS, lastPTS) > 0 {
                     // Bypass the readiness check: this is the final sample and
                     // dropping it would shorten the video.
-                    _ = write(last, at: now)
+                    _ = write(last, overlayTime: end.seconds, at: endPTS)
                 }
                 isClosed = true
                 lastPixelBuffer = nil

@@ -544,10 +544,10 @@ struct PopoverView: View {
         VStack(spacing: 12) {
             HStack {
                 Circle()
-                    .fill(.red)
+                    .fill(captureManager.isPaused ? .orange : .red)
                     .frame(width: 10, height: 10)
-                    .opacity(pulseOpacity)
-                Text("Recording")
+                    .opacity(captureManager.isPaused ? 1 : pulseOpacity)
+                Text(captureManager.isPaused ? "Paused" : "Recording")
                     .font(.headline)
                 Spacer()
                 Text(formatTime(captureManager.elapsedTime))
@@ -557,17 +557,30 @@ struct PopoverView: View {
             Text("\(captureManager.capturedFrameCount) frames captured")
                 .font(.caption).foregroundColor(.secondary)
 
-            Button(action: { captureManager.stopCapture() }) {
-                HStack {
-                    Image(systemName: "stop.fill")
-                    Text("Stop Recording")
+            HStack(spacing: 8) {
+                Button(action: { captureManager.togglePause() }) {
+                    HStack {
+                        Image(systemName: captureManager.isPaused ? "play.fill" : "pause.fill")
+                        Text(captureManager.isPaused ? "Resume" : "Pause")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+
+                Button(action: { captureManager.stopCapture() }) {
+                    HStack {
+                        Image(systemName: "stop.fill")
+                        Text("Stop")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .controlSize(.large)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .controlSize(.large)
 
             Button("Cancel", action: { captureManager.cancelCapture() })
                 .font(.caption)
