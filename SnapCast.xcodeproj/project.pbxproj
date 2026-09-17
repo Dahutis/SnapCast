@@ -15,6 +15,8 @@
 		A100000034 /* VideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000034 /* VideoRecorder.swift */; };
 		A100000035 /* MicrophoneCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000035 /* MicrophoneCapture.swift */; };
 		A100000038 /* KeystrokeOverlayRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000038 /* KeystrokeOverlayRenderer.swift */; };
+		A100000042 /* ClickOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000042 /* ClickOverlay.swift */; };
+		A100000041 /* RecordingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000041 /* RecordingOverlay.swift */; };
 		A100000037 /* KeystrokeMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000037 /* KeystrokeMonitor.swift */; };
 		A100000036 /* KeystrokeTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000036 /* KeystrokeTimeline.swift */; };
 		A100000006 /* RegionSelectionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000006 /* RegionSelectionOverlay.swift */; };
@@ -56,6 +58,8 @@
 		B100000034 /* VideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecorder.swift; sourceTree = "<group>"; };
 		B100000035 /* MicrophoneCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneCapture.swift; sourceTree = "<group>"; };
 		B100000038 /* KeystrokeOverlayRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeystrokeOverlayRenderer.swift; sourceTree = "<group>"; };
+		B100000042 /* ClickOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickOverlay.swift; sourceTree = "<group>"; };
+		B100000041 /* RecordingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOverlay.swift; sourceTree = "<group>"; };
 		B100000037 /* KeystrokeMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeystrokeMonitor.swift; sourceTree = "<group>"; };
 		B100000036 /* KeystrokeTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeystrokeTimeline.swift; sourceTree = "<group>"; };
 		B100000006 /* RegionSelectionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionSelectionOverlay.swift; sourceTree = "<group>"; };
@@ -108,6 +112,8 @@
 				B100000036 /* KeystrokeTimeline.swift */,
 				B100000037 /* KeystrokeMonitor.swift */,
 				B100000038 /* KeystrokeOverlayRenderer.swift */,
+				B100000042 /* ClickOverlay.swift */,
+				B100000041 /* RecordingOverlay.swift */,
 			);
 			path = KeyInput;
 			sourceTree = "<group>";
@@ -322,6 +328,8 @@
 				A100000034 /* VideoRecorder.swift in Sources */,
 				A100000035 /* MicrophoneCapture.swift in Sources */,
 				A100000038 /* KeystrokeOverlayRenderer.swift in Sources */,
+				A100000042 /* ClickOverlay.swift in Sources */,
+				A100000041 /* RecordingOverlay.swift in Sources */,
 				A100000037 /* KeystrokeMonitor.swift in Sources */,
 				A100000036 /* KeystrokeTimeline.swift in Sources */,
 				A100000006 /* RegionSelectionOverlay.swift in Sources */,

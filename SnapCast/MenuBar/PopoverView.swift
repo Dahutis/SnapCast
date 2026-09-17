@@ -494,6 +494,14 @@ struct PopoverView: View {
                 }
             }
 
+            Toggle(isOn: $settings.showClicks) {
+                Label("Show Clicks", systemImage: "cursorarrow.click")
+                    .font(.caption)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             HStack {
                 if settings.outputFormat.isVideo {
                     Text("FPS: \(settings.videoFps)")
@@ -718,8 +726,10 @@ struct PopoverView: View {
                 }
 
                 // Keystrokes
-                settingsSection("Keystrokes") {
+                settingsSection("Keystrokes & Clicks") {
                     Toggle("Show Keystrokes in Recordings", isOn: $settings.showKeystrokes)
+                        .font(.caption)
+                    Toggle("Show Mouse Clicks in Recordings", isOn: $settings.showClicks)
                         .font(.caption)
                     settingsRow("Show") {
                         Picker("", selection: $settings.keystrokeMode) {
@@ -741,7 +751,7 @@ struct PopoverView: View {
                         .pickerStyle(.segmented)
                         .labelsHidden()
                     }
-                    Text("Keys are drawn into the GIF/MP4, not on screen. SnapCast's own shortcuts and password fields are never shown.")
+                    Text("Keys and click rings are drawn into the GIF/MP4, not on screen. SnapCast's own shortcuts and password fields are never shown. Left clicks are yellow, right clicks blue.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }

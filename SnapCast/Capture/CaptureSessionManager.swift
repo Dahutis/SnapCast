@@ -46,6 +46,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
     private var videoRecorder: VideoRecorder?
     private var microphone: MicrophoneCapture?
     private var keystrokeMonitor: KeystrokeMonitor?
+    private var clickMonitor: ClickMonitor?
     /// Pushes volume slider changes into the active VideoRecorder.
     private var volumeObservers: Set<AnyCancellable> = []
     private var timer: Timer?
@@ -132,7 +133,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 frameProcessor = nil
                 microphone?.stop()
                 microphone = nil
-                stopKeystrokeCapture()
+                stopOverlayCapture()
                 videoRecorder?.cancel()
                 videoRecorder = nil
                 volumeObservers.removeAll()
@@ -294,6 +295,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 // region mode, the rect SCKit should crop to natively.
                 var pixelScale: CGFloat = 1
                 var videoSourceRect: CGRect?
+                // Captured area in CG global points, for mapping clicks.
+                var overlayCaptureRect = CGRect.zero
 
                 switch mode {
                 case .region:
@@ -312,6 +315,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     annotationScreen = result.screen
                     pixelScale = result.screen.backingScaleFactor
                     videoSourceRect = rect
+                    overlayCaptureRect = rect.offsetBy(dx: display.frame.minX, dy: display.frame.minY)
 
                 case .window:
                     guard let window = await WindowPicker.pickWindow() else { return }
@@ -323,6 +327,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     captureHeight = Int(frame.height)
                     self.cropRect = nil
                     pixelScale = Self.screen(containingCGRect: frame)?.backingScaleFactor ?? 2
+                    // Window moves during recording aren't tracked.
+                    overlayCaptureRect = frame
 
                 case .fullScreen:
                     guard let (display, excludedWindows) = await WindowPicker.pickDisplay() else { return }
@@ -365,7 +371,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     self.annotationSession = session
                 }
 
-                let keystrokes = self.startKeystrokeCapture()
+                let overlay = self.startOverlayCapture(captureRect: overlayCaptureRect)
 
                 if settings.outputFormat.isVideo {
                     try await self.startVideoStream(
@@ -376,7 +382,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                         ),
                         sourceRect: videoSourceRect,
                         pixelScale: pixelScale,
-                        keystrokes: keystrokes
+                        overlay: overlay
                     )
                     self.cropRect = nil
                     self.didStartStream(isVideo: true)
@@ -415,7 +421,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     targetSize: (settings.resizeEnabled || self.cropRect != nil)
                         ? CGSize(width: outputWidth, height: outputHeight)
                         : nil,
-                    keystrokes: keystrokes,
+                    overlay: overlay,
                     fps: settings.fps
                 )
 
@@ -432,7 +438,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 annotationSession = nil
                 microphone?.stop()
                 microphone = nil
-                stopKeystrokeCapture()
+                stopOverlayCapture()
                 videoRecorder?.cancel()
                 videoRecorder = nil
                 volumeObservers.removeAll()
@@ -475,7 +481,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
         pointSize: CGSize,
         sourceRect: CGRect?,
         pixelScale: CGFloat,
-        keystrokes: KeystrokeOverlay?
+        overlay: RecordingOverlay?
     ) async throws {
         let codec = settings.videoCodec
         let fps = settings.videoFps
@@ -536,7 +542,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
             quality: settings.videoQuality,
             recordSystemAudio: recordAudio,
             recordMicrophone: recordMicrophone,
-            keystrokes: keystrokes
+            overlay: overlay
         )
         videoRecorder = recorder
 
@@ -566,31 +572,49 @@ class CaptureSessionManager: NSObject, ObservableObject {
         self.stream = stream
     }
 
-    /// Starts listening for keys if "Show Keystrokes" is on. Returns nil (and
-    /// records without captions) when Input Monitoring isn't granted.
-    private func startKeystrokeCapture() -> KeystrokeOverlay? {
-        guard settings.showKeystrokes else { return nil }
-
-        let timeline = KeystrokeTimeline()
-        let monitor = KeystrokeMonitor(
-            timeline: timeline,
-            mode: settings.keystrokeMode,
-            ignoredShortcuts: Array(settings.shortcuts.values)
-        )
-        guard monitor.start() else {
-            exportError = "Show Keystrokes needs Input Monitoring permission (Settings → Permissions) — recorded without key overlay."
-            return nil
+    /// Starts key and/or click listeners for the enabled overlays. A listener
+    /// that can't start (e.g. Input Monitoring not granted) is skipped with a
+    /// message; the recording goes ahead without it.
+    private func startOverlayCapture(captureRect: CGRect) -> RecordingOverlay? {
+        var keystrokes: RecordingOverlay.Keystrokes?
+        if settings.showKeystrokes {
+            let timeline = KeystrokeTimeline()
+            let monitor = KeystrokeMonitor(
+                timeline: timeline,
+                mode: settings.keystrokeMode,
+                ignoredShortcuts: Array(settings.shortcuts.values)
+            )
+            if monitor.start() {
+                keystrokeMonitor = monitor
+                keystrokes = RecordingOverlay.Keystrokes(
+                    timeline: timeline,
+                    renderer: KeystrokeOverlayRenderer(position: settings.keystrokePosition, size: settings.keystrokeSize)
+                )
+            } else {
+                exportError = "Show Keystrokes needs Input Monitoring permission (Settings → Permissions) — recorded without key overlay."
+            }
         }
-        keystrokeMonitor = monitor
-        return KeystrokeOverlay(
-            timeline: timeline,
-            renderer: KeystrokeOverlayRenderer(position: settings.keystrokePosition, size: settings.keystrokeSize)
-        )
+
+        var clicks: RecordingOverlay.Clicks?
+        if settings.showClicks {
+            let timeline = ClickTimeline()
+            let monitor = ClickMonitor(timeline: timeline)
+            if monitor.start() {
+                clickMonitor = monitor
+                clicks = RecordingOverlay.Clicks(timeline: timeline, captureRect: captureRect)
+            } else {
+                exportError = "Couldn't listen for mouse clicks — recorded without click overlay."
+            }
+        }
+
+        return RecordingOverlay(keystrokes: keystrokes, clicks: clicks)
     }
 
-    private func stopKeystrokeCapture() {
+    private func stopOverlayCapture() {
         keystrokeMonitor?.stop()
         keystrokeMonitor = nil
+        clickMonitor?.stop()
+        clickMonitor = nil
     }
 
     private static func screen(forDisplayID displayID: CGDirectDisplayID) -> NSScreen? {
@@ -629,7 +653,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
         // dismissing now won't drop trailing strokes.
         annotationSession?.dismiss()
         annotationSession = nil
-        stopKeystrokeCapture()
+        stopOverlayCapture()
 
         if let recorder = videoRecorder {
             videoRecorder = nil

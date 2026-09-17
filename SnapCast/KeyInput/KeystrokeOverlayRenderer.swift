@@ -1,13 +1,6 @@
 import CoreGraphics
 import CoreText
-import CoreVideo
 import Foundation
-
-/// What a recorder needs to burn keystrokes into its frames.
-struct KeystrokeOverlay {
-    let timeline: KeystrokeTimeline
-    let renderer: KeystrokeOverlayRenderer
-}
 
 /// Draws key caption bubbles into frames. Sizes scale with the frame height so
 /// a small region and a 5K display get proportionally similar bubbles.
@@ -28,56 +21,10 @@ final class KeystrokeOverlayRenderer: @unchecked Sendable {
         self.size = size
     }
 
-    // MARK: - Compositing
-
-    /// Copies `source` into `destination` (both 32BGRA, same dimensions) and
-    /// draws the captions on top. SCKit's buffers are never modified.
-    func composite(_ captions: [KeystrokeTimeline.VisibleCaption], source: CVPixelBuffer, destination: CVPixelBuffer) -> Bool {
-        let width = CVPixelBufferGetWidth(source)
-        let height = CVPixelBufferGetHeight(source)
-        guard width == CVPixelBufferGetWidth(destination), height == CVPixelBufferGetHeight(destination) else { return false }
-
-        CVPixelBufferLockBaseAddress(source, .readOnly)
-        CVPixelBufferLockBaseAddress(destination, [])
-        defer {
-            CVPixelBufferUnlockBaseAddress(destination, [])
-            CVPixelBufferUnlockBaseAddress(source, .readOnly)
-        }
-
-        guard let src = CVPixelBufferGetBaseAddress(source),
-              let dst = CVPixelBufferGetBaseAddress(destination) else { return false }
-        let srcBytesPerRow = CVPixelBufferGetBytesPerRow(source)
-        let dstBytesPerRow = CVPixelBufferGetBytesPerRow(destination)
-        let rowBytes = min(srcBytesPerRow, dstBytesPerRow)
-        for row in 0..<height {
-            memcpy(dst + row * dstBytesPerRow, src + row * srcBytesPerRow, rowBytes)
-        }
-        CVBufferPropagateAttachments(source, destination)
-
-        guard let context = CGContext(
-            data: dst, width: width, height: height, bitsPerComponent: 8,
-            bytesPerRow: dstBytesPerRow, space: Self.colorSpace, bitmapInfo: Self.bitmapInfo
-        ) else { return false }
-        draw(captions, in: context, canvas: CGSize(width: width, height: height))
-        return true
-    }
-
-    /// GIF path: returns a new image with the captions drawn on top.
-    func composite(_ captions: [KeystrokeTimeline.VisibleCaption], onto image: CGImage) -> CGImage? {
-        guard let context = CGContext(
-            data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
-            bytesPerRow: 0, space: Self.colorSpace, bitmapInfo: Self.bitmapInfo
-        ) else { return nil }
-        let canvas = CGSize(width: image.width, height: image.height)
-        context.draw(image, in: CGRect(origin: .zero, size: canvas))
-        draw(captions, in: context, canvas: canvas)
-        return context.makeImage()
-    }
-
     // MARK: - Layout
 
     /// Stacks bubbles from the chosen edge inward, newest closest to the edge.
-    private func draw(_ captions: [KeystrokeTimeline.VisibleCaption], in context: CGContext, canvas: CGSize) {
+    func draw(_ captions: [KeystrokeTimeline.VisibleCaption], in context: CGContext, canvas: CGSize) {
         let fontSize = max(13, (canvas.height * size.heightFraction).rounded())
         let margin = max(8, canvas.height * 0.04)
         let spacing = fontSize * 0.3

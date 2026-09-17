@@ -23,39 +23,39 @@ class FrameProcessor: NSObject, SCStreamOutput {
 
     private var firstTimestamp: TimeInterval?
 
-    private let keystrokes: KeystrokeOverlay?
+    private let overlay: RecordingOverlay?
     private let frameInterval: TimeInterval
     // Clean (caption-free) copy of the newest frame + its host time, guarded by `lock`.
     private var lastRawImage: CGImage?
     private var lastTimestamp: TimeInterval?
-    /// Re-emits the last frame while key captions animate over a static
-    /// screen, since SCKit sends no frames when nothing changes.
-    private var keystrokeTicker: DispatchSourceTimer?
+    /// Re-emits the last frame while overlay captions/clicks animate over a
+    /// static screen, since SCKit sends no frames when nothing changes.
+    private var overlayTicker: DispatchSourceTimer?
 
-    init(cropRect: CGRect?, targetSize: CGSize?, keystrokes: KeystrokeOverlay? = nil, fps: Int = 15) {
+    init(cropRect: CGRect?, targetSize: CGSize?, overlay: RecordingOverlay? = nil, fps: Int = 15) {
         self.cropRect = cropRect
         self.targetSize = targetSize
-        self.keystrokes = keystrokes
+        self.overlay = overlay
         self.frameInterval = 1 / Double(max(fps, 1))
         super.init()
 
-        if keystrokes != nil {
+        if overlay != nil {
             let ticker = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
             ticker.schedule(deadline: .now(), repeating: frameInterval)
-            ticker.setEventHandler { [weak self] in self?.tickKeystrokes() }
+            ticker.setEventHandler { [weak self] in self?.tickOverlay() }
             ticker.resume()
-            keystrokeTicker = ticker
+            overlayTicker = ticker
         }
     }
 
-    /// Stops the keystroke ticker. Call once the stream has stopped, before
+    /// Stops the overlay ticker. Call once the stream has stopped, before
     /// reading `frames`.
     func stop() {
-        keystrokeTicker?.cancel()
-        keystrokeTicker = nil
+        overlayTicker?.cancel()
+        overlayTicker = nil
     }
 
-    deinit { keystrokeTicker?.cancel() }
+    deinit { overlayTicker?.cancel() }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .screen else { return }
@@ -103,14 +103,11 @@ class FrameProcessor: NSObject, SCStreamOutput {
         store(cgImage, at: CMTimeGetSeconds(pts))
     }
 
-    /// Burns in any visible key captions and appends the frame.
+    /// Burns in any visible overlay (keys, clicks) and appends the frame.
     private func store(_ raw: CGImage, at timestamp: TimeInterval) {
         var image = raw
-        if let keystrokes {
-            let captions = keystrokes.timeline.visibleCaptions(at: timestamp)
-            if !captions.isEmpty, let composited = keystrokes.renderer.composite(captions, onto: raw) {
-                image = composited
-            }
+        if let overlay, let composited = overlay.composite(onto: raw, at: timestamp) {
+            image = composited
         }
 
         lock.lock()
@@ -125,8 +122,8 @@ class FrameProcessor: NSObject, SCStreamOutput {
         lastTimestamp = timestamp
     }
 
-    private func tickKeystrokes() {
-        guard let keystrokes else { return }
+    private func tickOverlay() {
+        guard let overlay else { return }
         lock.lock()
         let raw = lastRawImage
         let last = lastTimestamp
@@ -135,7 +132,7 @@ class FrameProcessor: NSObject, SCStreamOutput {
         let now = KeystrokeTimeline.now
         guard let raw, let last,
               now - last >= frameInterval * 1.5,
-              keystrokes.timeline.needsFrame(at: now) else { return }
+              overlay.needsFrame(at: now) else { return }
         store(raw, at: now)
     }
 

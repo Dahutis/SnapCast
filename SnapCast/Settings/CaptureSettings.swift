@@ -60,6 +60,9 @@ class CaptureSettings: ObservableObject {
     @Published var showKeystrokes: Bool {
         didSet { UserDefaults.standard.set(showKeystrokes, forKey: "showKeystrokes") }
     }
+    @Published var showClicks: Bool {
+        didSet { UserDefaults.standard.set(showClicks, forKey: "showClicks") }
+    }
     @Published var keystrokeMode: KeystrokeMode {
         didSet { UserDefaults.standard.set(keystrokeMode.rawValue, forKey: "keystrokeMode") }
     }
@@ -178,6 +181,7 @@ class CaptureSettings: ObservableObject {
         self.microphoneVolume = defaults.object(forKey: "microphoneVolume") as? Double ?? 1.0
         self.microphoneDeviceID = defaults.string(forKey: "microphoneDeviceID") ?? ""
         self.showKeystrokes = defaults.bool(forKey: "showKeystrokes")
+        self.showClicks = defaults.bool(forKey: "showClicks")
         self.keystrokeMode = KeystrokeMode(rawValue: defaults.string(forKey: "keystrokeMode") ?? "") ?? .shortcuts
         self.keystrokePosition = KeystrokePosition(rawValue: defaults.string(forKey: "keystrokePosition") ?? "") ?? .bottomCenter
         self.keystrokeSize = KeystrokeSize(rawValue: defaults.string(forKey: "keystrokeSize") ?? "") ?? .medium

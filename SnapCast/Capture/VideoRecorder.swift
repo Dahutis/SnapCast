@@ -40,11 +40,11 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     /// Where the writer records; differs from `outputURL` when a mixdown is needed.
     private let recordingURL: URL
 
-    private let keystrokes: KeystrokeOverlay?
+    private let overlay: RecordingOverlay?
     private let frameInterval: Double
-    /// Re-emits the last frame while key captions are animating over a
+    /// Re-emits the last frame while overlay captions/clicks animate over a
     /// static screen (SCKit sends no frames when nothing changes).
-    private var keystrokeTicker: DispatchSourceTimer?
+    private var overlayTicker: DispatchSourceTimer?
 
     // Touched only on `queue`.
     private var sessionStarted = false
@@ -95,10 +95,10 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
         outputURL: URL, width: Int, height: Int, fps: Int,
         codec: VideoCodec, quality: VideoQuality,
         recordSystemAudio: Bool, recordMicrophone: Bool,
-        keystrokes: KeystrokeOverlay? = nil
+        overlay: RecordingOverlay? = nil
     ) throws {
         self.outputURL = outputURL
-        self.keystrokes = keystrokes
+        self.overlay = overlay
         frameInterval = 1 / Double(fps)
         recordingURL = (recordSystemAudio && recordMicrophone)
             ? outputURL.deletingLastPathComponent()
@@ -163,12 +163,12 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
 
         super.init()
 
-        if keystrokes != nil {
+        if overlay != nil {
             let ticker = DispatchSource.makeTimerSource(queue: queue)
             ticker.schedule(deadline: .now(), repeating: frameInterval)
-            ticker.setEventHandler { [weak self] in self?.tickKeystrokes() }
+            ticker.setEventHandler { [weak self] in self?.tickOverlay() }
             ticker.resume()
-            keystrokeTicker = ticker
+            overlayTicker = ticker
         }
     }
 
@@ -216,31 +216,29 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
         }
     }
 
-    /// Appends a frame, burning in key captions when any are visible at `pts`.
-    /// `lastPixelBuffer` always keeps the clean frame so re-emitted frames
-    /// don't stack captions.
+    /// Appends a frame, burning in the overlay when anything is visible at
+    /// `pts`. `lastPixelBuffer` always keeps the clean frame so re-emitted
+    /// frames don't stack overlays.
     private func write(_ pixelBuffer: CVPixelBuffer, at pts: CMTime) -> Bool {
         var frame = pixelBuffer
-        if let keystrokes, let pool = adaptor.pixelBufferPool {
-            let captions = keystrokes.timeline.visibleCaptions(at: pts.seconds)
+        if let overlay, overlay.needsFrame(at: pts.seconds), let pool = adaptor.pixelBufferPool {
             var composited: CVPixelBuffer?
-            if !captions.isEmpty,
-               CVPixelBufferPoolCreatePixelBuffer(nil, pool, &composited) == kCVReturnSuccess,
+            if CVPixelBufferPoolCreatePixelBuffer(nil, pool, &composited) == kCVReturnSuccess,
                let composited,
-               keystrokes.renderer.composite(captions, source: pixelBuffer, destination: composited) {
+               overlay.composite(source: pixelBuffer, destination: composited, at: pts.seconds) {
                 frame = composited
             }
         }
         return adaptor.append(frame, withPresentationTime: pts)
     }
 
-    private func tickKeystrokes() {
-        guard !isClosed, sessionStarted, let last = lastPixelBuffer, let keystrokes else { return }
+    private func tickOverlay() {
+        guard !isClosed, sessionStarted, let last = lastPixelBuffer, let overlay else { return }
         let now = CMClockGetTime(CMClockGetHostTimeClock())
         // 1.5× the interval so real SCKit frames (stamped slightly before
         // delivery) aren't pre-empted by a duplicate.
         guard now.seconds - lastPTS.seconds >= frameInterval * 1.5,
-              keystrokes.timeline.needsFrame(at: now.seconds) else { return }
+              overlay.needsFrame(at: now.seconds) else { return }
         append(last, at: now)
     }
 
@@ -305,8 +303,8 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
                     return
                 }
 
-                keystrokeTicker?.cancel()
-                keystrokeTicker = nil
+                overlayTicker?.cancel()
+                overlayTicker = nil
 
                 guard sessionStarted, lastPixelBuffer != nil else {
                     isClosed = true
@@ -423,8 +421,8 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     /// Abort the recording and delete the partial file.
     func cancel() {
         queue.async { [self] in
-            keystrokeTicker?.cancel()
-            keystrokeTicker = nil
+            overlayTicker?.cancel()
+            overlayTicker = nil
             guard !isClosed else { return }
             isClosed = true
             lastPixelBuffer = nil
