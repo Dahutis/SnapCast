@@ -45,6 +45,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
     private var frameProcessor: FrameProcessor?
     private var videoRecorder: VideoRecorder?
     private var microphone: MicrophoneCapture?
+    /// Pushes volume slider changes into the active VideoRecorder.
+    private var volumeObservers: Set<AnyCancellable> = []
     private var timer: Timer?
     private var startTime: Date?
     private var delayTimer: Timer?
@@ -131,6 +133,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 microphone = nil
                 videoRecorder?.cancel()
                 videoRecorder = nil
+                volumeObservers.removeAll()
             }
         }
     }
@@ -424,6 +427,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 microphone = nil
                 videoRecorder?.cancel()
                 videoRecorder = nil
+                volumeObservers.removeAll()
             }
         }
     }
@@ -526,6 +530,15 @@ class CaptureSessionManager: NSObject, ObservableObject {
         )
         videoRecorder = recorder
 
+        // @Published emits the current value on subscribe, so this also sets
+        // the initial gains.
+        settings.$systemAudioVolume
+            .sink { [weak recorder] volume in recorder?.systemAudioGain = Float(volume) }
+            .store(in: &volumeObservers)
+        settings.$microphoneVolume
+            .sink { [weak recorder] volume in recorder?.microphoneGain = Float(volume) }
+            .store(in: &volumeObservers)
+
         if recordMicrophone {
             let mic = try MicrophoneCapture(deviceID: settings.microphoneDeviceID, queue: recorder.queue) { [weak recorder] sample in
                 recorder?.appendMicrophone(sample)
@@ -582,6 +595,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
         if let recorder = videoRecorder {
             videoRecorder = nil
+            volumeObservers.removeAll()
             microphone?.stop()
             microphone = nil
             isExporting = true

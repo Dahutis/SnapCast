@@ -45,6 +45,14 @@ class CaptureSettings: ObservableObject {
     @Published var recordMicrophone: Bool {
         didSet { UserDefaults.standard.set(recordMicrophone, forKey: "recordMicrophone") }
     }
+    /// Linear gain, 0...3 (100% = unchanged).
+    @Published var systemAudioVolume: Double {
+        didSet { UserDefaults.standard.set(systemAudioVolume, forKey: "systemAudioVolume") }
+    }
+    /// Linear gain, 0...3 (100% = unchanged).
+    @Published var microphoneVolume: Double {
+        didSet { UserDefaults.standard.set(microphoneVolume, forKey: "microphoneVolume") }
+    }
     /// `AVCaptureDevice.uniqueID`; empty = system default input.
     @Published var microphoneDeviceID: String {
         didSet { UserDefaults.standard.set(microphoneDeviceID, forKey: "microphoneDeviceID") }
@@ -154,6 +162,8 @@ class CaptureSettings: ObservableObject {
         self.videoQuality = VideoQuality(rawValue: defaults.string(forKey: "videoQuality") ?? "") ?? .medium
         self.recordSystemAudio = defaults.object(forKey: "recordSystemAudio") as? Bool ?? true
         self.recordMicrophone = defaults.bool(forKey: "recordMicrophone")
+        self.systemAudioVolume = defaults.object(forKey: "systemAudioVolume") as? Double ?? 1.0
+        self.microphoneVolume = defaults.object(forKey: "microphoneVolume") as? Double ?? 1.0
         self.microphoneDeviceID = defaults.string(forKey: "microphoneDeviceID") ?? ""
         self.quality = defaults.object(forKey: "quality") as? Double ?? 0.8
         self.resizeEnabled = defaults.bool(forKey: "resizeEnabled")

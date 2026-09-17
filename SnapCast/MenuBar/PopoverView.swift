@@ -482,6 +482,13 @@ struct PopoverView: View {
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
+
+                if settings.recordSystemAudio {
+                    volumeSlider(icon: "speaker.wave.2", value: $settings.systemAudioVolume)
+                }
+                if settings.recordMicrophone {
+                    volumeSlider(icon: "mic", value: $settings.microphoneVolume)
+                }
             }
 
             HStack {
@@ -669,9 +676,17 @@ struct PopoverView: View {
                     }
                     Toggle("Record System Audio", isOn: $settings.recordSystemAudio)
                         .font(.caption)
+                    if settings.recordSystemAudio {
+                        settingsRow("Volume") {
+                            volumeSlider(icon: "speaker.wave.2", value: $settings.systemAudioVolume)
+                        }
+                    }
                     Toggle("Record Microphone", isOn: microphoneBinding)
                         .font(.caption)
                     if settings.recordMicrophone {
+                        settingsRow("Mic Volume") {
+                            volumeSlider(icon: "mic", value: $settings.microphoneVolume)
+                        }
                         settingsRow("Mic") {
                             Picker("", selection: $settings.microphoneDeviceID) {
                                 Text("System Default").tag("")
@@ -914,6 +929,24 @@ struct PopoverView: View {
     private func statusColor(isGranted: Bool, needsRelaunch: Bool) -> Color {
         if isGranted { return .green }
         return .orange
+    }
+
+    /// 0–300% gain slider. Double-click the percentage to reset to 100%.
+    private func volumeSlider(icon: String, value: Binding<Double>) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(width: 16)
+            Slider(value: value, in: 0...3, step: 0.05)
+                .controlSize(.mini)
+            Text("\(Int((value.wrappedValue * 100).rounded()))%")
+                .font(.caption).monospacedDigit()
+                .foregroundColor(value.wrappedValue > 1 ? .orange : .secondary)
+                .frame(width: 38, alignment: .trailing)
+                .onTapGesture(count: 2) { value.wrappedValue = 1 }
+                .help("Double-click to reset to 100%")
+        }
     }
 
     /// Turning the mic on triggers the permission prompt right away, so it

@@ -56,6 +56,23 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
         return _frameCount
     }
 
+    // Gains can change mid-recording from the UI, hence the lock.
+    private let gainLock = NSLock()
+    private var _systemAudioGain: Float = 1
+    private var _microphoneGain: Float = 1
+
+    /// Linear gain for system audio (1 = unchanged, up to 3 = +9.5 dB).
+    var systemAudioGain: Float {
+        get { gainLock.lock(); defer { gainLock.unlock() }; return _systemAudioGain }
+        set { gainLock.lock(); _systemAudioGain = newValue; gainLock.unlock() }
+    }
+
+    /// Linear gain for the microphone (1 = unchanged, up to 3 = +9.5 dB).
+    var microphoneGain: Float {
+        get { gainLock.lock(); defer { gainLock.unlock() }; return _microphoneGain }
+        set { gainLock.lock(); _microphoneGain = newValue; gainLock.unlock() }
+    }
+
     static let audioSampleRate = 48_000
     static let audioChannelCount = 2
 
@@ -144,7 +161,7 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
         guard sampleBuffer.isValid, !isClosed else { return }
 
         if type == .audio {
-            appendAudio(sampleBuffer, to: systemAudioInput)
+            appendAudio(sampleBuffer, to: systemAudioInput, gain: systemAudioGain)
             return
         }
         guard type == .screen else { return }
@@ -185,16 +202,49 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     /// Microphone samples from MicrophoneCapture. Must be called on `queue`.
     func appendMicrophone(_ sampleBuffer: CMSampleBuffer) {
         guard !isClosed else { return }
-        appendAudio(sampleBuffer, to: microphoneInput)
+        appendAudio(sampleBuffer, to: microphoneInput, gain: microphoneGain)
     }
 
-    private func appendAudio(_ sampleBuffer: CMSampleBuffer, to audioInput: AVAssetWriterInput?) {
+    private func appendAudio(_ sampleBuffer: CMSampleBuffer, to audioInput: AVAssetWriterInput?, gain: Float) {
         // The session starts on the first video frame; audio that arrives
         // earlier would land before the timeline origin, so drop it.
         guard let audioInput, writer.status == .writing, sessionStarted,
               CMTimeCompare(sampleBuffer.presentationTimeStamp, sessionStart) >= 0,
               audioInput.isReadyForMoreMediaData else { return }
+        if gain != 1 {
+            Self.processSamples(sampleBuffer, gain: gain)
+        }
         audioInput.append(sampleBuffer)
+    }
+
+    /// Applies `gain` to float32 PCM in place, then soft-limits so boosted
+    /// or summed audio saturates smoothly instead of hard-clipping. Buffers
+    /// in other formats are left untouched.
+    private static func processSamples(_ sampleBuffer: CMSampleBuffer, gain: Float) {
+        guard let format = sampleBuffer.formatDescription?.audioStreamBasicDescription,
+              format.mFormatFlags & kAudioFormatFlagIsFloat != 0,
+              format.mBitsPerChannel == 32 else { return }
+
+        // Ceiling sits below 0 dBFS because AAC encoding overshoots peaks
+        // by up to ~10%.
+        let ceiling: Float = 0.9
+        let threshold: Float = 0.75
+        let headroom = ceiling - threshold
+        // Both SCKit and AVCaptureAudioDataOutput hand over contiguous block
+        // buffers, so the list points at the sample buffer's own memory.
+        try? sampleBuffer.withAudioBufferList { buffers, _ in
+            for buffer in buffers {
+                guard let data = buffer.mData else { continue }
+                let samples = data.assumingMemoryBound(to: Float.self)
+                for i in 0..<Int(buffer.mDataByteSize) / MemoryLayout<Float>.size {
+                    let x = samples[i] * gain
+                    let magnitude = abs(x)
+                    samples[i] = magnitude <= threshold
+                        ? x
+                        : (threshold + headroom * tanh((magnitude - threshold) / headroom)) * (x < 0 ? -1 : 1)
+                }
+            }
+        }
     }
 
     // MARK: - Lifecycle
@@ -301,6 +351,10 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
                                     input.markAsFinished()
                                     done.resume()
                                     return
+                                }
+                                if input.mediaType == .audio {
+                                    // Two full-scale sources can sum past 0 dBFS.
+                                    Self.processSamples(sample, gain: 1)
                                 }
                                 input.append(sample)
                             }
