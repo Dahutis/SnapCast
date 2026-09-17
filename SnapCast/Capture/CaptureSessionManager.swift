@@ -43,6 +43,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
 
     private var stream: SCStream?
     private var frameProcessor: FrameProcessor?
+    private var videoRecorder: VideoRecorder?
+    private var microphone: MicrophoneCapture?
     private var timer: Timer?
     private var startTime: Date?
     private var delayTimer: Timer?
@@ -70,7 +72,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
         if settings.showCaptureToast {
             CaptureToast.shared.show(imageURL: url)
         }
-        if settings.openEditorAfterCapture {
+        if settings.openEditorAfterCapture, url.pathExtension != OutputFormat.mp4.fileExtension {
             PostProcessController.shared.open(url: url)
         }
     }
@@ -125,6 +127,10 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 timer?.invalidate()
                 timer = nil
                 frameProcessor = nil
+                microphone?.stop()
+                microphone = nil
+                videoRecorder?.cancel()
+                videoRecorder = nil
             }
         }
     }
@@ -279,6 +285,11 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 var annotationTargetRect: NSRect?
                 var annotationScreen: NSScreen?
 
+                // Video only: Retina scale of the captured screen and, for
+                // region mode, the rect SCKit should crop to natively.
+                var pixelScale: CGFloat = 1
+                var videoSourceRect: CGRect?
+
                 switch mode {
                 case .region:
                     guard let result = await RegionSelectionOverlay.selectRegion() else { return }
@@ -294,6 +305,8 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     captureHeight = display.height
                     annotationTargetRect = result.globalRect
                     annotationScreen = result.screen
+                    pixelScale = result.screen.backingScaleFactor
+                    videoSourceRect = rect
 
                 case .window:
                     guard let window = await WindowPicker.pickWindow() else { return }
@@ -304,6 +317,7 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     captureWidth = Int(frame.width)
                     captureHeight = Int(frame.height)
                     self.cropRect = nil
+                    pixelScale = Self.screen(containingCGRect: frame)?.backingScaleFactor ?? 2
 
                 case .fullScreen:
                     guard let (display, excludedWindows) = await WindowPicker.pickDisplay() else { return }
@@ -316,12 +330,10 @@ class CaptureSessionManager: NSObject, ObservableObject {
                     captureHeight = display.height
                     self.cropRect = nil
 
-                    if let screen = NSScreen.screens.first(where: {
-                        let id = $0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
-                        return id == display.displayID
-                    }) ?? NSScreen.main {
+                    if let screen = Self.screen(forDisplayID: display.displayID) ?? NSScreen.main {
                         annotationTargetRect = screen.frame
                         annotationScreen = screen
+                        pixelScale = screen.backingScaleFactor
                     }
                 }
 
@@ -346,6 +358,21 @@ class CaptureSessionManager: NSObject, ObservableObject {
                         return
                     }
                     self.annotationSession = session
+                }
+
+                if settings.outputFormat.isVideo {
+                    try await self.startVideoStream(
+                        filter: filter,
+                        pointSize: CGSize(
+                            width: videoSourceRect?.width ?? CGFloat(captureWidth),
+                            height: videoSourceRect?.height ?? CGFloat(captureHeight)
+                        ),
+                        sourceRect: videoSourceRect,
+                        pixelScale: pixelScale
+                    )
+                    self.cropRect = nil
+                    self.didStartStream(isVideo: true)
+                    return
                 }
 
                 let config = SCStreamConfiguration()
@@ -387,34 +414,151 @@ class CaptureSessionManager: NSObject, ObservableObject {
                 try await stream.startCapture()
 
                 self.stream = stream
-                self.isRecording = true
-                self.capturedFrameCount = 0
-                self.elapsedTime = 0
-                self.startTime = Date()
-
-                // Stream is live — flip the annotation palette into its
-                // recording layout (Stop button + timer). Canvas keeps
-                // accepting strokes the whole time.
-                self.annotationSession?.enterRecordingMode()
-
-                timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                    Task { @MainActor [weak self] in
-                        guard let self = self, let start = self.startTime else { return }
-                        self.elapsedTime = Date().timeIntervalSince(start)
-                        self.capturedFrameCount = self.frameProcessor?.frameCount ?? 0
-                        self.annotationSession?.updateElapsed(self.elapsedTime)
-
-                        if self.elapsedTime >= Double(self.settings.maxDuration) {
-                            self.stopCapture()
-                        }
-                    }
-                }
+                self.didStartStream(isVideo: false)
 
             } catch {
                 exportError = "Capture failed: \(error.localizedDescription)"
                 annotationSession?.dismiss()
                 annotationSession = nil
+                microphone?.stop()
+                microphone = nil
+                videoRecorder?.cancel()
+                videoRecorder = nil
             }
+        }
+    }
+
+    /// Shared post-start bookkeeping for GIF and video streams.
+    private func didStartStream(isVideo: Bool) {
+        isRecording = true
+        capturedFrameCount = 0
+        elapsedTime = 0
+        startTime = Date()
+
+        // Stream is live — flip the annotation palette into its
+        // recording layout (Stop button + timer). Canvas keeps
+        // accepting strokes the whole time.
+        annotationSession?.enterRecordingMode()
+
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, let start = self.startTime else { return }
+                self.elapsedTime = Date().timeIntervalSince(start)
+                self.capturedFrameCount = self.videoRecorder?.frameCount ?? self.frameProcessor?.frameCount ?? 0
+                self.annotationSession?.updateElapsed(self.elapsedTime)
+
+                // Max duration is a GIF safeguard (frames live in memory);
+                // video streams to disk and runs until stopped.
+                if !isVideo, self.elapsedTime >= Double(self.settings.maxDuration) {
+                    self.stopCapture()
+                }
+            }
+        }
+    }
+
+    /// Configures SCKit to deliver frames already cropped (`sourceRect`) and
+    /// scaled to the final pixel size, and pipes them into a VideoRecorder.
+    private func startVideoStream(
+        filter: SCContentFilter,
+        pointSize: CGSize,
+        sourceRect: CGRect?,
+        pixelScale: CGFloat
+    ) async throws {
+        let codec = settings.videoCodec
+        let fps = settings.videoFps
+
+        var size = CGSize(width: pointSize.width * pixelScale, height: pointSize.height * pixelScale)
+        if settings.resizeEnabled {
+            if settings.maintainAspectRatio {
+                let aspect = pointSize.width / pointSize.height
+                size = CGSize(width: CGFloat(settings.resizeWidth), height: CGFloat(settings.resizeWidth) / aspect)
+            } else {
+                size = CGSize(width: settings.resizeWidth, height: settings.resizeHeight)
+            }
+        }
+        let longest = max(size.width, size.height)
+        if longest > CGFloat(codec.maxDimension) {
+            let factor = CGFloat(codec.maxDimension) / longest
+            size = CGSize(width: size.width * factor, height: size.height * factor)
+        }
+        // Encoders require even dimensions for 4:2:0 chroma subsampling.
+        let width = max(2, Int(size.width) & ~1)
+        let height = max(2, Int(size.height) & ~1)
+
+        let config = SCStreamConfiguration()
+        config.width = width
+        config.height = height
+        if let sourceRect {
+            config.sourceRect = sourceRect
+        }
+        config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
+        config.showsCursor = settings.captureCursor
+        config.pixelFormat = kCVPixelFormatType_32BGRA
+        config.colorSpaceName = CGColorSpace.sRGB
+        config.queueDepth = 8
+
+        // Mic access is checked up front: a denied prompt shouldn't kill the
+        // recording, it just records without the mic and says so.
+        var recordMicrophone = settings.recordMicrophone
+        if recordMicrophone, !(await MicrophoneCapture.requestAccess()) {
+            recordMicrophone = false
+            exportError = "Microphone access denied — recording without mic. Enable it in System Settings → Privacy & Security → Microphone."
+        }
+
+        let recordAudio = settings.recordSystemAudio
+        if recordAudio {
+            config.capturesAudio = true
+            config.sampleRate = VideoRecorder.audioSampleRate
+            config.channelCount = VideoRecorder.audioChannelCount
+            // Keep SnapCast's own sounds (e.g. NSSound.beep) out of the track.
+            config.excludesCurrentProcessAudio = true
+        }
+
+        let recorder = try VideoRecorder(
+            outputURL: settings.outputFileURL(extension: OutputFormat.mp4.fileExtension),
+            width: width,
+            height: height,
+            fps: fps,
+            codec: codec,
+            quality: settings.videoQuality,
+            recordSystemAudio: recordAudio,
+            recordMicrophone: recordMicrophone
+        )
+        videoRecorder = recorder
+
+        if recordMicrophone {
+            let mic = try MicrophoneCapture(deviceID: settings.microphoneDeviceID, queue: recorder.queue) { [weak recorder] sample in
+                recorder?.appendMicrophone(sample)
+            }
+            mic.start()
+            microphone = mic
+        }
+
+        let stream = SCStream(filter: filter, configuration: config, delegate: nil)
+        try stream.addStreamOutput(recorder, type: .screen, sampleHandlerQueue: recorder.queue)
+        if recordAudio {
+            try stream.addStreamOutput(recorder, type: .audio, sampleHandlerQueue: recorder.queue)
+        }
+        try await stream.startCapture()
+        self.stream = stream
+    }
+
+    private static func screen(forDisplayID displayID: CGDirectDisplayID) -> NSScreen? {
+        NSScreen.screens.first {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) == displayID
+        }
+    }
+
+    /// Screen with the largest overlap with a rect in CG global coordinates
+    /// (top-left origin), e.g. `SCWindow.frame`.
+    private static func screen(containingCGRect rect: CGRect) -> NSScreen? {
+        NSScreen.screens.max { a, b in
+            func overlap(_ s: NSScreen) -> CGFloat {
+                guard let id = s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else { return 0 }
+                let i = CGDisplayBounds(id).intersection(rect)
+                return i.isNull ? 0 : i.width * i.height
+            }
+            return overlap(a) < overlap(b)
         }
     }
 
@@ -435,6 +579,21 @@ class CaptureSessionManager: NSObject, ObservableObject {
         // dismissing now won't drop trailing strokes.
         annotationSession?.dismiss()
         annotationSession = nil
+
+        if let recorder = videoRecorder {
+            videoRecorder = nil
+            microphone?.stop()
+            microphone = nil
+            isExporting = true
+            do {
+                let url = try await recorder.finish()
+                finishExport(url: url, isAnimated: true)
+            } catch {
+                exportError = error.localizedDescription
+            }
+            isExporting = false
+            return
+        }
 
         guard let processor = frameProcessor, !processor.frames.isEmpty else {
             exportError = "No frames captured"

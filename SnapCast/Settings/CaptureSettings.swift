@@ -30,6 +30,25 @@ class CaptureSettings: ObservableObject {
     @Published var fps: Int {
         didSet { UserDefaults.standard.set(fps, forKey: "fps") }
     }
+    @Published var videoFps: Int {
+        didSet { UserDefaults.standard.set(videoFps, forKey: "videoFps") }
+    }
+    @Published var videoCodec: VideoCodec {
+        didSet { UserDefaults.standard.set(videoCodec.rawValue, forKey: "videoCodec") }
+    }
+    @Published var videoQuality: VideoQuality {
+        didSet { UserDefaults.standard.set(videoQuality.rawValue, forKey: "videoQuality") }
+    }
+    @Published var recordSystemAudio: Bool {
+        didSet { UserDefaults.standard.set(recordSystemAudio, forKey: "recordSystemAudio") }
+    }
+    @Published var recordMicrophone: Bool {
+        didSet { UserDefaults.standard.set(recordMicrophone, forKey: "recordMicrophone") }
+    }
+    /// `AVCaptureDevice.uniqueID`; empty = system default input.
+    @Published var microphoneDeviceID: String {
+        didSet { UserDefaults.standard.set(microphoneDeviceID, forKey: "microphoneDeviceID") }
+    }
     @Published var quality: Double {
         didSet { UserDefaults.standard.set(quality, forKey: "quality") }
     }
@@ -130,6 +149,12 @@ class CaptureSettings: ObservableObject {
         self.fullPageWidth = defaults.object(forKey: "fullPageWidth") as? Int ?? 1440
         self.fullPageWaitTime = defaults.object(forKey: "fullPageWaitTime") as? Double ?? 3.0
         self.fps = defaults.object(forKey: "fps") as? Int ?? 15
+        self.videoFps = defaults.object(forKey: "videoFps") as? Int ?? 30
+        self.videoCodec = VideoCodec(rawValue: defaults.string(forKey: "videoCodec") ?? "") ?? .h264
+        self.videoQuality = VideoQuality(rawValue: defaults.string(forKey: "videoQuality") ?? "") ?? .medium
+        self.recordSystemAudio = defaults.object(forKey: "recordSystemAudio") as? Bool ?? true
+        self.recordMicrophone = defaults.bool(forKey: "recordMicrophone")
+        self.microphoneDeviceID = defaults.string(forKey: "microphoneDeviceID") ?? ""
         self.quality = defaults.object(forKey: "quality") as? Double ?? 0.8
         self.resizeEnabled = defaults.bool(forKey: "resizeEnabled")
         self.resizeWidth = defaults.object(forKey: "resizeWidth") as? Int ?? 640

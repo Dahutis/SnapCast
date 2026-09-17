@@ -70,8 +70,44 @@ enum ScreenshotFormat: String, CaseIterable, Codable {
 
 enum OutputFormat: String, CaseIterable, Codable {
     case gif = "GIF"
+    case mp4 = "MP4"
 
     var fileExtension: String {
-        return "gif"
+        switch self {
+        case .gif: return "gif"
+        case .mp4: return "mp4"
+        }
+    }
+
+    var isVideo: Bool { self == .mp4 }
+}
+
+enum VideoCodec: String, CaseIterable, Codable {
+    case h264 = "H.264"
+    case hevc = "HEVC"
+
+    /// Longest side the hardware encoder accepts. H.264 tops out at 4096 on
+    /// Apple silicon/T2 encoders, so 5K/6K Retina captures get scaled down.
+    var maxDimension: Int {
+        switch self {
+        case .h264: return 4096
+        case .hevc: return 8192
+        }
+    }
+}
+
+enum VideoQuality: String, CaseIterable, Codable {
+    case low = "Low"
+    case medium = "Medium"
+    case high = "High"
+
+    /// Bits per pixel per frame. Screen content (flat UI, text) compresses far
+    /// better than camera footage, so these sit well below typical video rates.
+    var bitsPerPixel: Double {
+        switch self {
+        case .low: return 0.04
+        case .medium: return 0.08
+        case .high: return 0.16
+        }
     }
 }

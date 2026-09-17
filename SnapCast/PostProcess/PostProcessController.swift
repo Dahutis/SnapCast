@@ -17,8 +17,13 @@ final class PostProcessController: NSObject, NSWindowDelegate {
 
     private override init() { super.init() }
 
-    /// Open the editor on a saved capture file (PNG / JPEG / GIF).
+    /// Open the editor on a saved capture file (PNG / JPEG / GIF). Videos
+    /// aren't editable here yet — they open in the default player instead.
     func open(url: URL) {
+        if url.pathExtension.lowercased() == OutputFormat.mp4.fileExtension {
+            NSWorkspace.shared.open(url)
+            return
+        }
         guard let settings else {
             NSSound.beep()
             return

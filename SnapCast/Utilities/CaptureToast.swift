@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 
 /// iOS-style "capture saved" preview that slides into the bottom-right of the
 /// active screen after a screenshot/GIF/merger is exported.
@@ -43,7 +44,25 @@ final class CaptureToast {
     func show(imageURL: URL) {
         dismissCurrent(animated: false)
 
+        if imageURL.pathExtension.lowercased() == OutputFormat.mp4.fileExtension {
+            Task {
+                let generator = AVAssetImageGenerator(asset: AVURLAsset(url: imageURL))
+                generator.appliesPreferredTrackTransform = true
+                generator.maximumSize = CGSize(width: 720, height: 720)
+                guard let frame = try? await generator.image(at: .zero).image else { return }
+                let image = NSImage(cgImage: frame, size: NSSize(width: frame.width, height: frame.height))
+                self.present(image: image, url: imageURL, isVideo: true)
+            }
+            return
+        }
+
         guard let image = NSImage(contentsOf: imageURL) else { return }
+        present(image: image, url: imageURL, isVideo: false)
+    }
+
+    private func present(image: NSImage, url imageURL: URL, isVideo: Bool) {
+        dismissCurrent(animated: false)
+
         // Show on whichever screen the cursor currently lives on; fall back to main.
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) })
@@ -68,7 +87,7 @@ final class CaptureToast {
         panel.isReleasedWhenClosed = false
         panel.ignoresMouseEvents = false
 
-        let content = ToastContentView(image: image, imageURL: imageURL) { [weak self] in
+        let content = ToastContentView(image: image, imageURL: imageURL, isVideo: isVideo) { [weak self] in
             self?.dismissCurrent(animated: true)
         }
         panel.contentView = content
@@ -163,7 +182,7 @@ private final class ToastContentView: NSView {
     private let imageURL: URL
     private let onClose: () -> Void
 
-    init(image: NSImage, imageURL: URL, onClose: @escaping () -> Void) {
+    init(image: NSImage, imageURL: URL, isVideo: Bool, onClose: @escaping () -> Void) {
         self.imageURL = imageURL
         self.onClose = onClose
         super.init(frame: .zero)
@@ -219,6 +238,25 @@ private final class ToastContentView: NSView {
             close.heightAnchor.constraint(equalToConstant: 22),
         ])
 
+        // Click anywhere on the thumbnail to open the file in its default app.
+        let click = NSClickGestureRecognizer(target: self, action: #selector(handleImageClick))
+        imageView.addGestureRecognizer(click)
+
+        if isVideo {
+            // Videos aren't editable yet — show a play badge instead of Edit.
+            let play = NSImageView()
+            play.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "Play")
+            play.symbolConfiguration = .init(pointSize: 36, weight: .regular)
+            play.contentTintColor = NSColor.white.withAlphaComponent(0.9)
+            play.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(play, positioned: .above, relativeTo: imageView)
+            NSLayoutConstraint.activate([
+                play.centerXAnchor.constraint(equalTo: centerXAnchor),
+                play.centerYAnchor.constraint(equalTo: centerYAnchor),
+            ])
+            return
+        }
+
         // Edit button (bottom-left) — opens the capture in the post-process
         // editor. Tinted background so it stays legible over bright captures.
         let edit = NSButton()
@@ -241,10 +279,6 @@ private final class ToastContentView: NSView {
             edit.topAnchor.constraint(equalTo: topAnchor, constant: 6),
             edit.heightAnchor.constraint(equalToConstant: 22),
         ])
-
-        // Click anywhere on the thumbnail to open the file in its default app.
-        let click = NSClickGestureRecognizer(target: self, action: #selector(handleImageClick))
-        imageView.addGestureRecognizer(click)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) not supported") }

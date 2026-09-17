@@ -1,0 +1,331 @@
+import AVFoundation
+import ScreenCaptureKit
+import CoreMedia
+import CoreVideo
+
+enum VideoRecorderError: LocalizedError {
+    case noFrames
+    case writerFailed(Error?)
+
+    var errorDescription: String? {
+        switch self {
+        case .noFrames: return "No frames captured"
+        case .writerFailed(let error): return "Video writer failed: \(error?.localizedDescription ?? "unknown error")"
+        }
+    }
+}
+
+/// SCStreamOutput that streams frames (plus optional system audio and
+/// microphone) straight into an MP4 via AVAssetWriter.
+/// Unlike FrameProcessor nothing is buffered in memory, so recordings can run
+/// for minutes at full Retina resolution. Cropping and scaling are done by
+/// ScreenCaptureKit itself (`sourceRect` / `width` / `height`), so buffers are
+/// appended as-is and encoded in hardware.
+///
+/// All writer access happens on `queue` — pass it as the stream's
+/// sampleHandlerQueue so callbacks and `finish()` never race.
+///
+/// With both audio sources on, they are recorded as two tracks into a
+/// temporary file and mixed down to a single track in `finish()` — most
+/// players, browsers and chat apps only play the first audio track.
+final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
+    let outputURL: URL
+    let queue = DispatchQueue(label: "com.nxcapture.snapcast.video-recorder")
+
+    private let writer: AVAssetWriter
+    private let videoInput: AVAssetWriterInput
+    private let adaptor: AVAssetWriterInputPixelBufferAdaptor
+    private let systemAudioInput: AVAssetWriterInput?
+    private let microphoneInput: AVAssetWriterInput?
+    /// Where the writer records; differs from `outputURL` when a mixdown is needed.
+    private let recordingURL: URL
+
+    // Touched only on `queue`.
+    private var sessionStarted = false
+    private var sessionStart: CMTime = .invalid
+    private var isClosed = false
+    private var lastPixelBuffer: CVPixelBuffer?
+    private var lastPTS: CMTime = .invalid
+
+    private let countLock = NSLock()
+    private var _frameCount = 0
+
+    var frameCount: Int {
+        countLock.lock()
+        defer { countLock.unlock() }
+        return _frameCount
+    }
+
+    static let audioSampleRate = 48_000
+    static let audioChannelCount = 2
+
+    static var aacSettings: [String: Any] {
+        [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: audioSampleRate,
+            AVNumberOfChannelsKey: audioChannelCount,
+            AVEncoderBitRateKey: 160_000,
+        ]
+    }
+
+    init(
+        outputURL: URL, width: Int, height: Int, fps: Int,
+        codec: VideoCodec, quality: VideoQuality,
+        recordSystemAudio: Bool, recordMicrophone: Bool
+    ) throws {
+        self.outputURL = outputURL
+        recordingURL = (recordSystemAudio && recordMicrophone)
+            ? outputURL.deletingLastPathComponent()
+                .appendingPathComponent(".\(outputURL.deletingPathExtension().lastPathComponent).tracks.mp4")
+            : outputURL
+        try? FileManager.default.removeItem(at: outputURL)
+        try? FileManager.default.removeItem(at: recordingURL)
+
+        writer = try AVAssetWriter(outputURL: recordingURL, fileType: .mp4)
+        writer.shouldOptimizeForNetworkUse = true
+
+        let bitrate = max(1_000_000, Int(Double(width * height * fps) * quality.bitsPerPixel))
+        var compression: [String: Any] = [
+            AVVideoAverageBitRateKey: bitrate,
+            AVVideoExpectedSourceFrameRateKey: fps,
+            AVVideoMaxKeyFrameIntervalKey: fps * 2,
+            AVVideoAllowFrameReorderingKey: false,
+        ]
+        if codec == .h264 {
+            compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel
+        }
+
+        let outputSettings: [String: Any] = [
+            AVVideoCodecKey: codec == .h264 ? AVVideoCodecType.h264 : AVVideoCodecType.hevc,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height,
+            AVVideoCompressionPropertiesKey: compression,
+            AVVideoColorPropertiesKey: [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
+            ],
+        ]
+
+        videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
+        videoInput.expectsMediaDataInRealTime = true
+
+        adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: videoInput,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height,
+            ]
+        )
+
+        guard writer.canAdd(videoInput) else { throw VideoRecorderError.writerFailed(writer.error) }
+        writer.add(videoInput)
+
+        // Both sources deliver float PCM; the writer transcodes to AAC.
+        func makeAudioInput(_ enabled: Bool, writer: AVAssetWriter) throws -> AVAssetWriterInput? {
+            guard enabled else { return nil }
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: Self.aacSettings)
+            input.expectsMediaDataInRealTime = true
+            guard writer.canAdd(input) else { throw VideoRecorderError.writerFailed(writer.error) }
+            writer.add(input)
+            return input
+        }
+        systemAudioInput = try makeAudioInput(recordSystemAudio, writer: writer)
+        microphoneInput = try makeAudioInput(recordMicrophone, writer: writer)
+        guard writer.startWriting() else { throw VideoRecorderError.writerFailed(writer.error) }
+
+        super.init()
+    }
+
+    // MARK: - SCStreamOutput
+
+    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        guard sampleBuffer.isValid, !isClosed else { return }
+
+        if type == .audio {
+            appendAudio(sampleBuffer, to: systemAudioInput)
+            return
+        }
+        guard type == .screen else { return }
+
+        // SCKit emits idle/blank status frames without an image when nothing
+        // on screen changed — only complete frames carry pixels.
+        guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
+              let statusRaw = attachments.first?[.status] as? Int,
+              SCFrameStatus(rawValue: statusRaw) == .complete,
+              let pixelBuffer = sampleBuffer.imageBuffer else { return }
+
+        append(pixelBuffer, at: sampleBuffer.presentationTimeStamp)
+    }
+
+    private func append(_ pixelBuffer: CVPixelBuffer, at pts: CMTime) {
+        guard writer.status == .writing else { return }
+
+        if !sessionStarted {
+            writer.startSession(atSourceTime: pts)
+            sessionStarted = true
+            sessionStart = pts
+        }
+
+        // Real-time input: if the encoder is behind, drop the frame rather
+        // than block SCKit's delivery queue.
+        guard videoInput.isReadyForMoreMediaData,
+              !lastPTS.isValid || CMTimeCompare(pts, lastPTS) > 0 else { return }
+
+        if adaptor.append(pixelBuffer, withPresentationTime: pts) {
+            lastPixelBuffer = pixelBuffer
+            lastPTS = pts
+            countLock.lock()
+            _frameCount += 1
+            countLock.unlock()
+        }
+    }
+
+    /// Microphone samples from MicrophoneCapture. Must be called on `queue`.
+    func appendMicrophone(_ sampleBuffer: CMSampleBuffer) {
+        guard !isClosed else { return }
+        appendAudio(sampleBuffer, to: microphoneInput)
+    }
+
+    private func appendAudio(_ sampleBuffer: CMSampleBuffer, to audioInput: AVAssetWriterInput?) {
+        // The session starts on the first video frame; audio that arrives
+        // earlier would land before the timeline origin, so drop it.
+        guard let audioInput, writer.status == .writing, sessionStarted,
+              CMTimeCompare(sampleBuffer.presentationTimeStamp, sessionStart) >= 0,
+              audioInput.isReadyForMoreMediaData else { return }
+        audioInput.append(sampleBuffer)
+    }
+
+    // MARK: - Lifecycle
+
+    /// Call after the SCStream has stopped. Holds the last frame until "now"
+    /// (SCKit only sends frames when the screen changes, so a static ending
+    /// would otherwise be cut off), then finalizes the file.
+    func finish() async throws -> URL {
+        let recordedURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+            queue.async { [self] in
+                guard !isClosed else {
+                    continuation.resume(throwing: VideoRecorderError.noFrames)
+                    return
+                }
+
+                guard sessionStarted, lastPixelBuffer != nil else {
+                    isClosed = true
+                    writer.cancelWriting()
+                    try? FileManager.default.removeItem(at: recordingURL)
+                    continuation.resume(throwing: VideoRecorderError.noFrames)
+                    return
+                }
+
+                // SCKit timestamps are on the host clock.
+                let now = CMClockGetTime(CMClockGetHostTimeClock())
+                if let last = lastPixelBuffer, CMTimeCompare(now, lastPTS) > 0 {
+                    // Bypass the readiness check: this is the final sample and
+                    // dropping it would shorten the video.
+                    _ = adaptor.append(last, withPresentationTime: now)
+                }
+                isClosed = true
+                lastPixelBuffer = nil
+                videoInput.markAsFinished()
+                systemAudioInput?.markAsFinished()
+                microphoneInput?.markAsFinished()
+
+                writer.finishWriting { [self] in
+                    if writer.status == .completed {
+                        continuation.resume(returning: recordingURL)
+                    } else {
+                        continuation.resume(throwing: VideoRecorderError.writerFailed(writer.error))
+                    }
+                }
+            }
+        }
+
+        guard recordedURL != outputURL else { return outputURL }
+        defer { try? FileManager.default.removeItem(at: recordedURL) }
+        try await Self.mixDownAudio(from: recordedURL, to: outputURL)
+        return outputURL
+    }
+
+    /// Rewrites `source` with its video track passed through untouched and all
+    /// audio tracks mixed into one AAC track.
+    private static func mixDownAudio(from source: URL, to destination: URL) async throws {
+        let asset = AVURLAsset(url: source)
+        guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else {
+            throw VideoRecorderError.noFrames
+        }
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        let videoFormat = try await videoTrack.load(.formatDescriptions).first
+
+        let reader = try AVAssetReader(asset: asset)
+        let videoOutput = AVAssetReaderTrackOutput(track: videoTrack, outputSettings: nil)
+        let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: audioSampleRate,
+            AVNumberOfChannelsKey: audioChannelCount,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsNonInterleaved: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ])
+        guard reader.canAdd(videoOutput), reader.canAdd(audioOutput) else {
+            throw VideoRecorderError.writerFailed(reader.error)
+        }
+        reader.add(videoOutput)
+        reader.add(audioOutput)
+
+        let writer = try AVAssetWriter(outputURL: destination, fileType: .mp4)
+        writer.shouldOptimizeForNetworkUse = true
+        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: nil, sourceFormatHint: videoFormat)
+        let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: aacSettings)
+        guard writer.canAdd(videoInput), writer.canAdd(audioInput) else {
+            throw VideoRecorderError.writerFailed(writer.error)
+        }
+        writer.add(videoInput)
+        writer.add(audioInput)
+
+        guard reader.startReading(), writer.startWriting() else {
+            throw VideoRecorderError.writerFailed(reader.error ?? writer.error)
+        }
+        writer.startSession(atSourceTime: .zero)
+
+        let pumps = [(videoOutput as AVAssetReaderOutput, videoInput), (audioOutput, audioInput)]
+        await withTaskGroup(of: Void.self) { group in
+            for (index, (output, input)) in pumps.enumerated() {
+                group.addTask {
+                    await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+                        let queue = DispatchQueue(label: "com.nxcapture.snapcast.mixdown.\(index)")
+                        input.requestMediaDataWhenReady(on: queue) {
+                            while input.isReadyForMoreMediaData {
+                                guard let sample = output.copyNextSampleBuffer() else {
+                                    input.markAsFinished()
+                                    done.resume()
+                                    return
+                                }
+                                input.append(sample)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if reader.status == .failed {
+            writer.cancelWriting()
+            throw VideoRecorderError.writerFailed(reader.error)
+        }
+        await writer.finishWriting()
+        guard writer.status == .completed else { throw VideoRecorderError.writerFailed(writer.error) }
+    }
+
+    /// Abort the recording and delete the partial file.
+    func cancel() {
+        queue.async { [self] in
+            guard !isClosed else { return }
+            isClosed = true
+            lastPixelBuffer = nil
+            writer.cancelWriting()
+            try? FileManager.default.removeItem(at: recordingURL)
+        }
+    }
+}

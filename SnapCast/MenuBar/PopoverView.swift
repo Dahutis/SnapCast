@@ -455,11 +455,49 @@ struct PopoverView: View {
             .labelsHidden()
 
             HStack {
-                Text("FPS: \(settings.fps)")
-                    .font(.caption).monospacedDigit()
+                Text("Format")
+                    .font(.caption).foregroundColor(.secondary)
                 Spacer()
-                Text("Max: \(settings.maxDuration)s")
-                    .font(.caption).monospacedDigit()
+                Picker("", selection: $settings.outputFormat) {
+                    ForEach(OutputFormat.allCases, id: \.self) { fmt in
+                        Text(fmt.rawValue).tag(fmt)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 120)
+            }
+
+            if settings.outputFormat.isVideo {
+                HStack {
+                    Toggle(isOn: $settings.recordSystemAudio) {
+                        Label("System Audio", systemImage: settings.recordSystemAudio ? "speaker.wave.2.fill" : "speaker.slash")
+                            .font(.caption)
+                    }
+                    Spacer()
+                    Toggle(isOn: microphoneBinding) {
+                        Label("Mic", systemImage: settings.recordMicrophone ? "mic.fill" : "mic.slash")
+                            .font(.caption)
+                    }
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+            }
+
+            HStack {
+                if settings.outputFormat.isVideo {
+                    Text("FPS: \(settings.videoFps)")
+                        .font(.caption).monospacedDigit()
+                    Spacer()
+                    Text("\(settings.videoCodec.rawValue) · \(settings.videoQuality.rawValue)")
+                        .font(.caption)
+                } else {
+                    Text("FPS: \(settings.fps)")
+                        .font(.caption).monospacedDigit()
+                    Spacer()
+                    Text("Max: \(settings.maxDuration)s")
+                        .font(.caption).monospacedDigit()
+                }
                 Spacer()
                 if settings.captureDelay > 0 {
                     Text("Delay: \(settings.captureDelay)s")
@@ -524,7 +562,7 @@ struct PopoverView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .scaleEffect(1.5)
-            Text("Encoding GIF...")
+            Text(settings.outputFormat.isVideo ? "Finishing video..." : "Encoding GIF...")
                 .font(.headline)
             Text("\(captureManager.capturedFrameCount) frames")
                 .font(.caption).foregroundColor(.secondary)
@@ -594,7 +632,7 @@ struct PopoverView: View {
                         Slider(value: fpsBinding, in: 1...60, step: 1)
                         Text("\(settings.fps)").frame(width: 28, alignment: .trailing).monospacedDigit()
                     }
-                    settingsRow("Max Duration") {
+                    settingsRow("Max (GIF)") {
                         Slider(value: maxDurationBinding, in: 1...120, step: 1)
                         Text("\(settings.maxDuration)s").frame(width: 36, alignment: .trailing).monospacedDigit()
                     }
@@ -604,6 +642,49 @@ struct PopoverView: View {
                     }
                     Toggle("Show Cursor", isOn: $settings.captureCursor)
                         .font(.caption)
+                }
+
+                // Video
+                settingsSection("Video (MP4)") {
+                    settingsRow("FPS") {
+                        Picker("", selection: $settings.videoFps) {
+                            ForEach([24, 30, 60], id: \.self) { Text("\($0)").tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+                    settingsRow("Codec") {
+                        Picker("", selection: $settings.videoCodec) {
+                            ForEach(VideoCodec.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+                    settingsRow("Quality") {
+                        Picker("", selection: $settings.videoQuality) {
+                            ForEach(VideoQuality.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+                    Toggle("Record System Audio", isOn: $settings.recordSystemAudio)
+                        .font(.caption)
+                    Toggle("Record Microphone", isOn: microphoneBinding)
+                        .font(.caption)
+                    if settings.recordMicrophone {
+                        settingsRow("Mic") {
+                            Picker("", selection: $settings.microphoneDeviceID) {
+                                Text("System Default").tag("")
+                                ForEach(MicrophoneCapture.availableDevices) { device in
+                                    Text(device.name).tag(device.id)
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                    }
+                    Text("Recorded at native Retina resolution unless Resize is on. H.264 plays everywhere; HEVC is smaller and allows up to 8K.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
 
                 // GIF
@@ -833,6 +914,20 @@ struct PopoverView: View {
     private func statusColor(isGranted: Bool, needsRelaunch: Bool) -> Color {
         if isGranted { return .green }
         return .orange
+    }
+
+    /// Turning the mic on triggers the permission prompt right away, so it
+    /// doesn't pop up in the middle of starting a recording.
+    private var microphoneBinding: Binding<Bool> {
+        Binding(
+            get: { settings.recordMicrophone },
+            set: { enabled in
+                settings.recordMicrophone = enabled
+                if enabled {
+                    Task { _ = await MicrophoneCapture.requestAccess() }
+                }
+            }
+        )
     }
 
     private var fpsBinding: Binding<Double> {
