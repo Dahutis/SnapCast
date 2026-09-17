@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 
 /// Listens to keyboard events during a recording and feeds KeystrokeTimeline.
 /// Uses a listen-only CGEventTap, which needs Input Monitoring permission —
@@ -15,6 +16,10 @@ final class KeystrokeMonitor {
     private let ignoredShortcuts: [ShortcutBinding]
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    /// Pending dead key (e.g. Czech ´ or ˇ) carried into the next keystroke.
+    /// Event taps see raw keys before the text system composes them, so
+    /// SnapCast composes "´" + "e" → "é" itself.
+    private var deadKeyState: UInt32 = 0
 
     private static let functionKeyCodes: Set<UInt16> = [
         122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111, 105, 107, 113,
@@ -101,26 +106,62 @@ final class KeystrokeMonitor {
 
             let isCommandChord = !modifiers.isDisjoint(with: [.control, .option, .command])
             if isCommandChord || Self.functionKeyCodes.contains(event.keyCode) {
+                deadKeyState = 0
                 timeline.addShortcut(chord.displayString, at: now)
                 return
             }
 
             guard mode == .allKeys else { return }
             if event.keyCode == Self.deleteKeyCode {
+                deadKeyState = 0
                 timeline.addTyped("⌫", at: now)
-            } else if let characters = event.characters, !characters.isEmpty,
-                      characters.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) && $0.value < 0xF700 }) {
+                return
+            }
+
+            let characters = typedCharacters(for: event)
+            if characters.isEmpty, deadKeyState != 0 {
+                // Dead key pressed; wait for the key it combines with.
+                return
+            }
+            if !characters.isEmpty,
+               characters.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) && $0.value < 0xF700 }) {
                 // Printable text (0xF700+ are AppKit's private arrow/function
                 // key codepoints).
                 timeline.addTyped(characters, at: now)
             } else {
                 // Return, Tab, Esc, arrows, … as their own bubble.
+                deadKeyState = 0
                 timeline.addShortcut(chord.displayString, at: now)
             }
 
         default:
             break
         }
+    }
+
+    /// Translates the key through the active keyboard layout, honouring dead
+    /// keys. Returns "" while a dead key is pending.
+    private func typedCharacters(for event: NSEvent) -> String {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let layoutData = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData),
+              let bytes = CFDataGetBytePtr(unsafeBitCast(layoutData, to: CFData.self)) else {
+            return event.characters ?? ""
+        }
+        let layout = bytes.withMemoryRebound(to: UCKeyboardLayout.self, capacity: 1) { $0 }
+
+        let flags = event.modifierFlags
+        var modifierState: UInt32 = 0
+        if flags.contains(.shift) { modifierState |= UInt32(shiftKey >> 8) }
+        if flags.contains(.capsLock) { modifierState |= UInt32(alphaLock >> 8) }
+
+        var chars = [UniChar](repeating: 0, count: 8)
+        var length = 0
+        let status = UCKeyTranslate(
+            layout, event.keyCode, UInt16(kUCKeyActionDown), modifierState,
+            UInt32(LMGetKbdType()), 0, &deadKeyState, chars.count, &length, &chars
+        )
+        guard status == noErr else { return event.characters ?? "" }
+        return String(utf16CodeUnits: chars, count: length)
     }
 
     private static func symbols(for modifiers: NSEvent.ModifierFlags) -> String {
