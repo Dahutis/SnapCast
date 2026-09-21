@@ -15,6 +15,10 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
 </p>
 
+<p align="center">
+  <img src="Presentation/update-banner-1.1-a.png" alt="SnapCast 1.1 — now records video">
+</p>
+
 ---
 
 ## Features
