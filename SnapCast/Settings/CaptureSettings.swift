@@ -162,6 +162,7 @@ class CaptureSettings: ObservableObject {
     }
 
     init() {
+        Self.migrateFromLegacyBundleID()
         let defaults = UserDefaults.standard
         self.captureType = CaptureType(rawValue: defaults.string(forKey: "captureType") ?? "") ?? .recording
         self.captureMode = CaptureMode(rawValue: defaults.string(forKey: "captureMode") ?? "") ?? .region
@@ -230,5 +231,22 @@ class CaptureSettings: ObservableObject {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
         return folder.appendingPathComponent(filename)
+    }
+}
+
+extension CaptureSettings {
+    /// Settings saved before the bundle ID moved from com.nxcapture.snapcast
+    /// live in the old defaults domain. Copy them over once, on the first
+    /// launch under the new ID.
+    private static func migrateFromLegacyBundleID() {
+        let defaults = UserDefaults.standard
+        let migratedKey = "migratedFromLegacyBundleID"
+        guard !defaults.bool(forKey: migratedKey) else { return }
+        defaults.set(true, forKey: migratedKey)
+        guard let legacy = UserDefaults(suiteName: "com.nxcapture.snapcast")?
+            .persistentDomain(forName: "com.nxcapture.snapcast") else { return }
+        for (key, value) in legacy where defaults.object(forKey: key) == nil {
+            defaults.set(value, forKey: key)
+        }
     }
 }

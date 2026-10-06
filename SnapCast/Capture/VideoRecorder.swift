@@ -30,7 +30,7 @@ enum VideoRecorderError: LocalizedError {
 /// players, browsers and chat apps only play the first audio track.
 final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
     let outputURL: URL
-    let queue = DispatchQueue(label: "com.nxcapture.snapcast.video-recorder")
+    let queue = DispatchQueue(label: "com.noxgames.snapcast.video-recorder")
 
     private let writer: AVAssetWriter
     private let videoInput: AVAssetWriterInput
@@ -454,7 +454,7 @@ final class VideoRecorder: NSObject, SCStreamOutput, @unchecked Sendable {
             for (index, (output, input)) in pumps.enumerated() {
                 group.addTask {
                     await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-                        let queue = DispatchQueue(label: "com.nxcapture.snapcast.mixdown.\(index)")
+                        let queue = DispatchQueue(label: "com.noxgames.snapcast.mixdown.\(index)")
                         input.requestMediaDataWhenReady(on: queue) {
                             while input.isReadyForMoreMediaData {
                                 guard let sample = output.copyNextSampleBuffer() else {
