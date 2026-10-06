@@ -22,6 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // and Settings → Permissions surface explicit Grant actions when state
         // is missing.
         ScreenPermissions.shared.checkPermission()
+
+        // Starts Sparkle's scheduled background update checks.
+        _ = Updater.shared
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

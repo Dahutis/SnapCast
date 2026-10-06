@@ -848,6 +848,11 @@ struct PopoverView: View {
                 Divider()
                 HStack {
                     Spacer()
+                    Button("Check for Updates…") {
+                        Updater.shared.checkForUpdates()
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                     Button("Quit SnapCast") {
                         NSApp.terminate(nil)
                     }
@@ -855,6 +860,10 @@ struct PopoverView: View {
                     .foregroundColor(.secondary)
                     Spacer()
                 }
+                Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
             }
             .padding()
         }

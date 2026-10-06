@@ -97,7 +97,7 @@ macOS asks for these the first time a feature needs them. You can manage them in
 
 ## Building from source
 
-Requirements: **macOS 13+** and **Xcode 15+**. No third-party dependencies.
+Requirements: **macOS 13+** and **Xcode 15+**. The only dependency is [Sparkle](https://sparkle-project.org) for auto-updates, fetched by Swift Package Manager.
 
 ```bash
 git clone https://github.com/Dahutis/NxCapture.git
@@ -109,6 +109,14 @@ In **Signing & Capabilities**, choose your own team, then build & run (`⌘R`).
 
 > [!IMPORTANT]
 > Sign with a real development team — not *Sign to Run Locally* (ad-hoc). With an ad-hoc signature every rebuild looks like a new app to macOS, and the Screen Recording permission prompt comes back over and over.
+
+## Releasing an update
+
+1. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `SnapCast/Info.plist`.
+2. Run `scripts/release.sh "What changed"`. It builds and signs the app, publishes the DMG as a GitHub Release, writes `appcast.xml` and commits it.
+3. Push to `main`. Installed copies find the update through Sparkle.
+
+The Sparkle signing key is in the login keychain of the machine that generated it (account `snapcast`). Back it up with `generate_keys --account snapcast -x <file>`; without it, no further updates can be published.
 
 ## Project structure
 
