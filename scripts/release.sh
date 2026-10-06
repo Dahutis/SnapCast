@@ -5,7 +5,12 @@
 # Before running: bump CFBundleShortVersionString and CFBundleVersion in
 # SnapCast/Info.plist. Sparkle compares CFBundleVersion, so it must grow.
 #
-# Usage: scripts/release.sh ["release notes"]
+# Usage: scripts/release.sh [--app path/to/SnapCast.app] ["release notes"]
+#
+# --app takes an app that was already exported with Developer ID, notarized
+# and stapled (Xcode → Archive → Distribute App → Direct Distribution) and
+# skips the local build. Without it the app is built here and signed with
+# the local Apple Development certificate — fine for this Mac only.
 set -euo pipefail
 
 cd "${0:A:h}/.."
@@ -15,6 +20,11 @@ SIGN_IDENTITY="${SIGN_IDENTITY:-Apple Development: jakub.hutecka@gmail.com (VL52
 TEAM_ID="${TEAM_ID:-8T9RVGUF2N}"
 REPO="Dahutis/NxCapture"
 KEY_ACCOUNT="snapcast"
+PREBUILT_APP=""
+if [[ "${1:-}" == "--app" ]]; then
+    PREBUILT_APP="$2"
+    shift 2
+fi
 NOTES="${1:-}"
 
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" SnapCast/Info.plist)
@@ -27,29 +37,50 @@ if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "==> Building SnapCast $VERSION ($BUILD)"
-xcodebuild -project SnapCast.xcodeproj -scheme SnapCast -configuration Release \
-    -derivedDataPath build/DerivedData \
-    CODE_SIGN_STYLE=Manual \
-    CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
-    DEVELOPMENT_TEAM="$TEAM_ID" \
-    PROVISIONING_PROFILE_SPECIFIER="" \
-    build -quiet
-APP=build/DerivedData/Build/Products/Release/SnapCast.app
+if [[ -n "$PREBUILT_APP" ]]; then
+    APP="${PREBUILT_APP%/}"
+    echo "==> Using notarized app $APP"
+    APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
+    APP_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Contents/Info.plist")
+    if [[ "$APP_VERSION" != "$VERSION" || "$APP_BUILD" != "$BUILD" ]]; then
+        echo "App is $APP_VERSION ($APP_BUILD) but Info.plist says $VERSION ($BUILD)." >&2
+        exit 1
+    fi
+    # Refuses anything that isn't Developer ID signed, notarized and stapled.
+    xcrun stapler validate "$APP"
+    spctl --assess --type execute -vv "$APP"
+else
+    echo "==> Building SnapCast $VERSION ($BUILD)"
+    xcodebuild -project SnapCast.xcodeproj -scheme SnapCast -configuration Release \
+        -derivedDataPath build/DerivedData \
+        CODE_SIGN_STYLE=Manual \
+        CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
+        DEVELOPMENT_TEAM="$TEAM_ID" \
+        PROVISIONING_PROFILE_SPECIFIER="" \
+        build -quiet
+    APP=build/DerivedData/Build/Products/Release/SnapCast.app
+fi
 codesign --verify --strict --deep "$APP"
 
 echo "==> Packaging $DMG_NAME"
 STAGE=build/dmg-stage
 rm -rf "$STAGE" && mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/"
+ditto "$APP" "$STAGE/SnapCast.app"
 ln -s /Applications "$STAGE/Applications"
 DMG="build/$DMG_NAME"
 rm -f "$DMG"
 hdiutil create -volname SnapCast -srcfolder "$STAGE" -format UDZO "$DMG" -quiet
-codesign --sign "$SIGN_IDENTITY" --timestamp "$DMG"
+# A notarized app carries its own stapled ticket, so its DMG stays unsigned.
+if [[ -z "$PREBUILT_APP" ]]; then
+    codesign --sign "$SIGN_IDENTITY" --timestamp "$DMG"
+fi
 
 echo "==> Signing update for Sparkle"
 SPARKLE_BIN=build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin
+if [[ ! -x "$SPARKLE_BIN/sign_update" ]]; then
+    xcodebuild -resolvePackageDependencies -project SnapCast.xcodeproj -scheme SnapCast \
+        -derivedDataPath build/DerivedData -quiet
+fi
 # Prints: sparkle:edSignature="…" length="…"
 SIGNATURE_ATTRS=$("$SPARKLE_BIN/sign_update" --account "$KEY_ACCOUNT" "$DMG")
 
