@@ -18,7 +18,7 @@ cd "${0:A:h}/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Volumes/KINGSTON/Developer/Applications/Xcode.app/Contents/Developer}"
 SIGN_IDENTITY="${SIGN_IDENTITY:-Apple Development: jakub.hutecka@gmail.com (VL52UU55N4)}"
 TEAM_ID="${TEAM_ID:-8T9RVGUF2N}"
-REPO="Dahutis/NxCapture"
+REPO="Dahutis/SnapCast"
 KEY_ACCOUNT="snapcast"
 PREBUILT_APP=""
 if [[ "${1:-}" == "--app" ]]; then

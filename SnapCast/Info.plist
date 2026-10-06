@@ -29,7 +29,7 @@
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUFeedURL</key>
-    <string>https://raw.githubusercontent.com/Dahutis/NxCapture/main/appcast.xml</string>
+    <string>https://raw.githubusercontent.com/Dahutis/SnapCast/main/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>reLJfq5NlMcvQ3GwFlampz5PAEyloVmgnjDfK5pPd6Y=</string>
 </dict>

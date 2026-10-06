@@ -75,7 +75,7 @@ Screenshot — Window, Screenshot — Full Page and Merger Session have no defau
 
 ## Installation
 
-1. Download the latest `.dmg` from [Releases](https://github.com/Dahutis/NxCapture/releases).
+1. Download the latest `.dmg` from [Releases](https://github.com/Dahutis/SnapCast/releases).
 2. Drag **SnapCast** into **Applications**.
 3. Launch it — the icon appears in the menu bar (there is no Dock icon).
 
@@ -100,7 +100,7 @@ macOS asks for these the first time a feature needs them. You can manage them in
 Requirements: **macOS 13+** and **Xcode 15+**. The only dependency is [Sparkle](https://sparkle-project.org) for auto-updates, fetched by Swift Package Manager.
 
 ```bash
-git clone https://github.com/Dahutis/NxCapture.git
+git clone https://github.com/Dahutis/SnapCast.git
 cd NxCapture
 open SnapCast.xcodeproj
 ```
