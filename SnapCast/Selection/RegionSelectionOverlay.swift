@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import ScreenCaptureKit
 
 struct RegionSelectionResult {
@@ -14,9 +15,16 @@ struct RegionSelectionResult {
 
 class RegionSelectionOverlay {
     private static var activeController: OverlayController?
+    /// Set for the whole call, including the short delay before the overlay
+    /// appears — a second shortcut press in that window would otherwise stack
+    /// another full-screen overlay on top of the first.
+    private static var isSelecting = false
 
     @MainActor
     static func selectRegion() async -> RegionSelectionResult? {
+        guard !isSelecting else { return nil }
+        isSelecting = true
+
         // Dismiss any popovers and activate the app
         NSApp.activate(ignoringOtherApps: true)
         try? await Task.sleep(nanoseconds: 200_000_000)
@@ -24,6 +32,7 @@ class RegionSelectionOverlay {
         return await withCheckedContinuation { continuation in
             let controller = OverlayController { result in
                 activeController = nil
+                isSelecting = false
                 continuation.resume(returning: result)
             }
             activeController = controller
@@ -37,10 +46,11 @@ private class OverlayController {
     var views: [OverlayView] = []
     let completion: (RegionSelectionResult?) -> Void
     private var hasCompleted = false
-    /// App-local Esc monitor — needed because on multi-display setups only one
-    /// overlay window can be `key`, so keyDown on the others would otherwise be
-    /// dropped. The monitor catches Esc regardless of which screen has focus.
-    private var keyMonitor: Any?
+    /// Esc as a system hot key. The overlay covers every screen above all
+    /// other windows, so Esc must work even when macOS declined to activate
+    /// SnapCast and key events still go to the previously focused app —
+    /// otherwise the only way out is force-quitting.
+    private var escapeHotKey: EscapeHotKey?
 
     init(completion: @escaping (RegionSelectionResult?) -> Void) {
         self.completion = completion
@@ -94,14 +104,8 @@ private class OverlayController {
             first.makeFirstResponder(firstView)
         }
 
-        // Global Esc fallback — on multi-display setups, only the primary
-        // overlay is key, so the other screens' views never see keyDown.
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 {
-                self?.finish(rect: nil, screen: nil)
-                return nil
-            }
-            return event
+        escapeHotKey = EscapeHotKey { [weak self] in
+            self?.finish(rect: nil, screen: nil)
         }
 
         NSApp.activate(ignoringOtherApps: true)
@@ -111,10 +115,7 @@ private class OverlayController {
         guard !hasCompleted else { return }
         hasCompleted = true
 
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-            keyMonitor = nil
-        }
+        escapeHotKey = nil
 
         for w in windows {
             w.orderOut(nil)
@@ -170,6 +171,60 @@ private class OverlayController {
                 self.completion(nil)
             }
         }
+    }
+}
+
+// MARK: - Esc hot key
+
+/// Registers Esc via `RegisterEventHotKey` for as long as the instance lives.
+/// Unlike an NSEvent monitor it fires whichever app is frontmost.
+private final class EscapeHotKey {
+    /// "SNES" — distinct from the shortcut dispatcher's signature so each
+    /// handler only reacts to its own hot keys.
+    private static let signature: OSType = 0x534E_4553
+
+    private let action: () -> Void
+    private var hotKeyRef: EventHotKeyRef?
+    private var eventHandler: EventHandlerRef?
+
+    init(action: @escaping () -> Void) {
+        self.action = action
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, event, userInfo in
+                guard let event, let userInfo else { return OSStatus(eventNotHandledErr) }
+                var hotKeyID = EventHotKeyID()
+                let status = GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+                guard status == noErr, hotKeyID.signature == EscapeHotKey.signature else {
+                    return OSStatus(eventNotHandledErr)
+                }
+                Unmanaged<EscapeHotKey>.fromOpaque(userInfo).takeUnretainedValue().action()
+                return noErr
+            },
+            1,
+            &spec,
+            // Unretained: deinit removes the handler first.
+            Unmanaged.passUnretained(self).toOpaque(),
+            &eventHandler
+        )
+        RegisterEventHotKey(
+            UInt32(kVK_Escape), 0, EventHotKeyID(signature: Self.signature, id: 0),
+            GetApplicationEventTarget(), 0, &hotKeyRef
+        )
+    }
+
+    deinit {
+        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
+        if let eventHandler { RemoveEventHandler(eventHandler) }
     }
 }
 
