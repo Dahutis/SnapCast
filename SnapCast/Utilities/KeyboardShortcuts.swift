@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import Combine
 
 // MARK: - Model
 
@@ -24,6 +25,16 @@ struct ShortcutBinding: Codable, Equatable {
     func matches(_ event: NSEvent) -> Bool {
         guard event.keyCode == keyCode else { return false }
         return event.modifierFlags.intersection(.deviceIndependentFlagsMask).rawValue == modifiersRaw
+    }
+
+    /// Modifier mask in the form `RegisterEventHotKey` expects.
+    var carbonModifiers: UInt32 {
+        var mods: UInt32 = 0
+        if modifiers.contains(.command) { mods |= UInt32(cmdKey) }
+        if modifiers.contains(.shift)   { mods |= UInt32(shiftKey) }
+        if modifiers.contains(.option)  { mods |= UInt32(optionKey) }
+        if modifiers.contains(.control) { mods |= UInt32(controlKey) }
+        return mods
     }
 
     /// macOS-style chord display (e.g. "⌘⇧6", "Esc").
@@ -98,10 +109,18 @@ enum ShortcutAction: String, CaseIterable, Codable {
     }
 }
 
-/// Global flag so the dispatcher pauses while the user is rebinding a shortcut
-/// (otherwise pressing the existing chord during rebind would re-fire the action).
+/// Global flag so the dispatcher pauses while the user is rebinding a shortcut.
+/// Registered hot keys swallow their chord before the recorder field sees it,
+/// so the dispatcher unregisters everything while this is set.
 enum ShortcutRecording {
-    static var isActive: Bool = false
+    static let didChangeNotification = Notification.Name("ShortcutRecordingDidChange")
+
+    static var isActive: Bool = false {
+        didSet {
+            guard isActive != oldValue else { return }
+            NotificationCenter.default.post(name: didChangeNotification, object: nil)
+        }
+    }
 }
 
 /// Renders an NSEvent.keyCode as a display string. Uses Carbon UCKeyTranslate
@@ -153,36 +172,124 @@ enum KeyCodeSymbol {
 
 // MARK: - Dispatcher
 
+/// Fires actions through Carbon `RegisterEventHotKey`, which works while
+/// SnapCast is in the background without Accessibility or Input Monitoring.
+///
+/// A registered hot key swallows its chord in every app, so bindings that only
+/// make sense during a capture (Stop, Pause, Esc, annotation toggle) are
+/// registered only while that capture is running. Otherwise ⌘⇧P or Esc would
+/// stop working everywhere else just because SnapCast is launched.
+@MainActor
 class KeyboardShortcuts {
     private let captureManager: CaptureSessionManager
     private let settings: CaptureSettings
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
+    private var hotKeyRefs: [EventHotKeyRef] = []
+    private var eventHandler: EventHandlerRef?
+    private var observers: [NSObjectProtocol] = []
+    private var cancellables: Set<AnyCancellable> = []
+
+    /// "SNCP" — signature shared by all of SnapCast's hot keys.
+    private static let signature: OSType = 0x534E_4350
 
     init(captureManager: CaptureSessionManager, settings: CaptureSettings) {
         self.captureManager = captureManager
         self.settings = settings
-        setupMonitors()
+        installEventHandler()
+        observeState()
+        registerHotKeys()
     }
 
-    private func setupMonitors() {
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
-        }
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
-            return event
+    private func installEventHandler() {
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, event, userInfo in
+                guard let event, let userInfo else { return OSStatus(eventNotHandledErr) }
+                var hotKeyID = EventHotKeyID()
+                let status = GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+                guard status == noErr, hotKeyID.signature == KeyboardShortcuts.signature else {
+                    return OSStatus(eventNotHandledErr)
+                }
+                let dispatcher = Unmanaged<KeyboardShortcuts>.fromOpaque(userInfo).takeUnretainedValue()
+                // Hot key events arrive on the main run loop.
+                MainActor.assumeIsolated { dispatcher.handleHotKey(id: hotKeyID.id) }
+                return noErr
+            },
+            1,
+            &spec,
+            // Unretained: deinit removes the handler first.
+            Unmanaged.passUnretained(self).toOpaque(),
+            &eventHandler
+        )
+    }
+
+    /// Re-register whenever the set of bindings or the set of active
+    /// session-only actions changes.
+    private func observeState() {
+        settings.$shortcuts
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.registerHotKeys() }
+            .store(in: &cancellables)
+        captureManager.$isRecording
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.registerHotKeys() }
+            .store(in: &cancellables)
+        for name in [ShortcutRecording.didChangeNotification, AnnotationSession.didChangeNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.registerHotKeys()
+            })
         }
     }
 
-    private func handleKeyEvent(_ event: NSEvent) {
+    private func isAvailable(_ action: ShortcutAction) -> Bool {
+        switch action {
+        case .stopRecording, .pauseRecording, .cancelCurrent:
+            return captureManager.isRecording
+        case .toggleAnnotation:
+            return AnnotationSession.current != nil
+        default:
+            return true
+        }
+    }
+
+    private func registerHotKeys() {
+        unregisterHotKeys()
         if ShortcutRecording.isActive { return }
-        for action in ShortcutAction.allCases {
-            guard let binding = settings.shortcuts[action.rawValue],
-                  binding.matches(event) else { continue }
-            dispatch(action)
-            return
+        for (index, action) in ShortcutAction.allCases.enumerated() {
+            guard isAvailable(action), let binding = settings.shortcuts[action.rawValue] else { continue }
+            var ref: EventHotKeyRef?
+            let id = EventHotKeyID(signature: Self.signature, id: UInt32(index))
+            // Fails if another app (or an earlier SnapCast action) already owns
+            // the chord; the action then simply has no hot key.
+            let status = RegisterEventHotKey(
+                UInt32(binding.keyCode), binding.carbonModifiers, id,
+                GetApplicationEventTarget(), 0, &ref
+            )
+            if status == noErr, let ref { hotKeyRefs.append(ref) }
         }
+    }
+
+    private func unregisterHotKeys() {
+        hotKeyRefs.forEach { UnregisterEventHotKey($0) }
+        hotKeyRefs.removeAll()
+    }
+
+    private func handleHotKey(id: UInt32) {
+        guard !ShortcutRecording.isActive else { return }
+        let actions = ShortcutAction.allCases
+        guard Int(id) < actions.count else { return }
+        dispatch(actions[Int(id)])
     }
 
     private func dispatch(_ action: ShortcutAction) {
@@ -226,7 +333,8 @@ class KeyboardShortcuts {
     }
 
     deinit {
-        if let monitor = globalMonitor { NSEvent.removeMonitor(monitor) }
-        if let monitor = localMonitor { NSEvent.removeMonitor(monitor) }
+        hotKeyRefs.forEach { UnregisterEventHotKey($0) }
+        if let eventHandler { RemoveEventHandler(eventHandler) }
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 }

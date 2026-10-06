@@ -4,7 +4,6 @@ struct PopoverView: View {
     @EnvironmentObject var settings: CaptureSettings
     @ObservedObject var captureManager: CaptureSessionManager
     @ObservedObject private var screenPermissions = ScreenPermissions.shared
-    @ObservedObject private var accessibilityPermissions = AccessibilityPermissions.shared
     @ObservedObject private var inputMonitoringPermissions = InputMonitoringPermissions.shared
     @State private var showingSettings = false
     @State private var pulseOpacity: Double = 1.0
@@ -64,7 +63,6 @@ struct PopoverView: View {
             // Re-read permission state every time the popover opens so the UI
             // reflects grants the user made in System Settings while away.
             screenPermissions.checkPermission()
-            accessibilityPermissions.refresh()
             inputMonitoringPermissions.refresh()
         }
     }
@@ -644,18 +642,6 @@ struct PopoverView: View {
                         relaunchAction: nil
                     )
                     permissionRow(
-                        icon: "keyboard",
-                        title: "Accessibility",
-                        subtitle: accessibilityPermissions.needsRelaunch
-                            ? "Granted — relaunch to apply"
-                            : "Required for global keyboard shortcuts",
-                        isGranted: accessibilityPermissions.isAuthorized,
-                        needsRelaunch: accessibilityPermissions.needsRelaunch,
-                        grantAction: { accessibilityPermissions.requestAccess() },
-                        openAction: { accessibilityPermissions.openSettings() },
-                        relaunchAction: { accessibilityPermissions.relaunch() }
-                    )
-                    permissionRow(
                         icon: "eye",
                         title: "Input Monitoring",
                         subtitle: inputMonitoringPermissions.needsRelaunch
@@ -665,7 +651,7 @@ struct PopoverView: View {
                         needsRelaunch: inputMonitoringPermissions.needsRelaunch,
                         grantAction: { inputMonitoringPermissions.requestAccess() },
                         openAction: { inputMonitoringPermissions.openSettings() },
-                        relaunchAction: { accessibilityPermissions.relaunch() }
+                        relaunchAction: { inputMonitoringPermissions.relaunch() }
                     )
                 }
 

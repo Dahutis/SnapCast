@@ -35,7 +35,6 @@
 		A100000019 /* FullPageCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000021 /* FullPageCapture.swift */; };
 		A100000020 /* CaptureToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000022 /* CaptureToast.swift */; };
 		A100000022 /* MergerStitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000024 /* MergerStitcher.swift */; };
-		A100000023 /* AccessibilityPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000023 /* AccessibilityPermissions.swift */; };
 		A100000039 /* InputMonitoringPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000039 /* InputMonitoringPermissions.swift */; };
 		A100000025 /* AnnotationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000025 /* AnnotationModel.swift */; };
 		A100000026 /* AnnotationCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000026 /* AnnotationCanvas.swift */; };
@@ -80,7 +79,6 @@
 		B100000021 /* FullPageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullPageCapture.swift; sourceTree = "<group>"; };
 		B100000022 /* CaptureToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureToast.swift; sourceTree = "<group>"; };
 		B100000024 /* MergerStitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergerStitcher.swift; sourceTree = "<group>"; };
-		B100000023 /* AccessibilityPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissions.swift; sourceTree = "<group>"; };
 		B100000039 /* InputMonitoringPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputMonitoringPermissions.swift; sourceTree = "<group>"; };
 		B100000025 /* AnnotationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationModel.swift; sourceTree = "<group>"; };
 		B100000026 /* AnnotationCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCanvas.swift; sourceTree = "<group>"; };
@@ -219,7 +217,6 @@
 			isa = PBXGroup;
 			children = (
 				B100000015 /* ScreenPermissions.swift */,
-				B100000023 /* AccessibilityPermissions.swift */,
 				B100000039 /* InputMonitoringPermissions.swift */,
 				B100000016 /* KeyboardShortcuts.swift */,
 				B100000022 /* CaptureToast.swift */,
@@ -347,7 +344,6 @@
 				A100000018 /* ScreenshotCapture.swift in Sources */,
 				A100000019 /* FullPageCapture.swift in Sources */,
 				A100000022 /* MergerStitcher.swift in Sources */,
-				A100000023 /* AccessibilityPermissions.swift in Sources */,
 				A100000039 /* InputMonitoringPermissions.swift in Sources */,
 				A100000025 /* AnnotationModel.swift in Sources */,
 				A100000026 /* AnnotationCanvas.swift in Sources */,

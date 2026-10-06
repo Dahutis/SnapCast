@@ -20,10 +20,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Read current permission state without surfacing prompts. The popover
         // and Settings → Permissions surface explicit Grant actions when state
-        // is missing; prompting at launch races with TCC's trust cache and can
-        // re-surface accessibility prompts for users who already granted.
+        // is missing.
         ScreenPermissions.shared.checkPermission()
-        AccessibilityPermissions.shared.refresh()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

@@ -28,7 +28,14 @@ enum AnnotationResult {
 /// when the user clicks Stop in the palette.
 @MainActor
 final class AnnotationSession {
-    static var current: AnnotationSession?
+    static let didChangeNotification = Notification.Name("AnnotationSessionDidChange")
+
+    static var current: AnnotationSession? {
+        didSet {
+            guard current !== oldValue else { return }
+            NotificationCenter.default.post(name: didChangeNotification, object: nil)
+        }
+    }
 
     let state = AnnotationState()
     private let targetRect: NSRect

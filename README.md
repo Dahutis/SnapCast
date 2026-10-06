@@ -92,7 +92,6 @@ macOS asks for these the first time a feature needs them. You can manage them in
 | Permission | Needed for |
 |---|---|
 | Screen Recording | All captures |
-| Accessibility | Global keyboard shortcuts |
 | Input Monitoring | Keystroke overlay in recordings |
 | Microphone | Recording with mic audio |
 

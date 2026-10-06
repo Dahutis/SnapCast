@@ -5,8 +5,8 @@ import Combine
 /// Keystrokes. Accessibility alone isn't enough on current macOS: without it
 /// a keyboard event tap only sees modifier changes, never actual key presses.
 ///
-/// Like Accessibility, the running process usually keeps reading "denied"
-/// after the user flips the switch in System Settings until it relaunches.
+/// The running process usually keeps reading "denied" after the user flips
+/// the switch in System Settings until it relaunches.
 @MainActor
 final class InputMonitoringPermissions: ObservableObject {
     static let shared = InputMonitoringPermissions()
@@ -43,6 +43,19 @@ final class InputMonitoringPermissions: ObservableObject {
     func openSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Quit and relaunch the app so a fresh grant takes effect.
+    func relaunch() {
+        let bundleURL = Bundle.main.bundleURL
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = ["-n", bundleURL.path]
+        try? task.run()
+        // Give `open` a moment to spawn the new instance before we exit.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            NSApp.terminate(nil)
         }
     }
 }
