@@ -15,7 +15,12 @@ set -euo pipefail
 
 cd "${0:A:h}/.."
 
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Volumes/KINGSTON/Developer/Applications/Xcode.app/Contents/Developer}"
+# Xcode lives on an external drive on the original dev Mac; elsewhere the
+# xcode-select default is used.
+KINGSTON_XCODE=/Volumes/KINGSTON/Developer/Applications/Xcode.app/Contents/Developer
+if [[ -z "${DEVELOPER_DIR:-}" && -d "$KINGSTON_XCODE" ]]; then
+    export DEVELOPER_DIR="$KINGSTON_XCODE"
+fi
 SIGN_IDENTITY="${SIGN_IDENTITY:-Apple Development: jakub.hutecka@gmail.com (VL52UU55N4)}"
 TEAM_ID="${TEAM_ID:-8T9RVGUF2N}"
 REPO="Dahutis/SnapCast"
@@ -34,6 +39,18 @@ DMG_NAME="SnapCast-$VERSION.dmg"
 
 if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
     echo "Release $TAG already exists — bump the version in SnapCast/Info.plist first." >&2
+    exit 1
+fi
+
+# Check the Sparkle key before anything is published, not halfway through.
+SPARKLE_BIN=build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin
+if [[ ! -x "$SPARKLE_BIN/sign_update" ]]; then
+    xcodebuild -resolvePackageDependencies -project SnapCast.xcodeproj -scheme SnapCast \
+        -derivedDataPath build/DerivedData -quiet
+fi
+if ! "$SPARKLE_BIN/generate_keys" --account "$KEY_ACCOUNT" -p >/dev/null 2>&1; then
+    echo "Sparkle signing key not found in the keychain. Import it first:" >&2
+    echo "  $SPARKLE_BIN/generate_keys --account $KEY_ACCOUNT -f <key file>" >&2
     exit 1
 fi
 
@@ -76,11 +93,6 @@ if [[ -z "$PREBUILT_APP" ]]; then
 fi
 
 echo "==> Signing update for Sparkle"
-SPARKLE_BIN=build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin
-if [[ ! -x "$SPARKLE_BIN/sign_update" ]]; then
-    xcodebuild -resolvePackageDependencies -project SnapCast.xcodeproj -scheme SnapCast \
-        -derivedDataPath build/DerivedData -quiet
-fi
 # Prints: sparkle:edSignature="…" length="…"
 SIGNATURE_ATTRS=$("$SPARKLE_BIN/sign_update" --account "$KEY_ACCOUNT" "$DMG")
 

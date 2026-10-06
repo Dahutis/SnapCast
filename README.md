@@ -112,11 +112,7 @@ In **Signing & Capabilities**, choose your own team, then build & run (`⌘R`).
 
 ## Releasing an update
 
-1. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `SnapCast/Info.plist`.
-2. Run `scripts/release.sh "What changed"`. It builds and signs the app, publishes the DMG as a GitHub Release, writes `appcast.xml` and commits it.
-3. Push to `main`. Installed copies find the update through Sparkle.
-
-The Sparkle signing key is in the login keychain of the machine that generated it (account `snapcast`). Back it up with `generate_keys --account snapcast -x <file>`; without it, no further updates can be published.
+Signing, notarization and publishing are described step by step in [RELEASING.md](RELEASING.md).
 
 ## Project structure
 
